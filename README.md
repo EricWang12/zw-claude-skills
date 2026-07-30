@@ -1,4 +1,4 @@
-# claude-plugins
+# zw-claude-skills
 
 A personal Claude Code plugin marketplace. Add it once, then install whichever plugins you
 want.
@@ -11,9 +11,9 @@ want.
 ## Install
 
 ```
-/plugin marketplace add YOUR-GITHUB-USERNAME/skill-vscode-debug
-/plugin install vscode-debug@claude-plugins
-/plugin install kiss-rules@claude-plugins
+/plugin marketplace add EricWang12/zw-claude-skills
+/plugin install vscode-debug@zw-claude-skills
+/plugin install kiss-rules@zw-claude-skills
 ```
 
 The marketplace only needs adding once; after that, new plugins here are one
@@ -23,8 +23,8 @@ The marketplace only needs adding once; after that, new plugins here are one
 `~/.claude/skills`:
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/skill-vscode-debug.git
-cd skill-vscode-debug
+git clone https://github.com/EricWang12/zw-claude-skills.git
+cd zw-claude-skills
 ./install.sh              # symlink into ~/.claude/skills
 ./install.sh --project    # or into ./.claude/skills, per-project
 ./install.sh --copy       # copy instead of symlink
@@ -80,19 +80,15 @@ in a `PreToolUse` hook — that one also fires for subagent tool calls, which
 `SessionStart` does not.
 
 Renaming the marketplace later forces everyone who added it to remove and re-add it, so
-`claude-plugins` in `.claude-plugin/marketplace.json` is worth settling before you publish.
+`zw-claude-skills` in `.claude-plugin/marketplace.json` is worth settling before you publish.
 Individual plugin names are free to change any time.
 
 ## Before you publish this repo
 
-Placeholders that need your details:
+Placeholders that still need your details:
 
-- `YOUR-GITHUB-USERNAME` in [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json),
-  both plugin manifests, and the install commands above
+- `YOUR-GITHUB-USERNAME` in both plugin manifests (`plugins/*/.claude-plugin/plugin.json`)
 - `YOUR-NAME` in [`LICENSE`](LICENSE)
-
-Consider renaming the repo too — `skill-vscode-debug` no longer describes a marketplace
-holding unrelated plugins.
 
 ## License
 
