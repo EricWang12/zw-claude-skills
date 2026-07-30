@@ -59,18 +59,29 @@ python3 scripts/make_debug_config.py \
     --override steps=1
 ```
 
-The script strips `torchrun`/`accelerate`/`deepspeed`, supplies the rank environment
-`torch.distributed` needs for a one-rank world, sets `justMyCode: false`, infers the
-project interpreter, applies your shrink overrides, and merges one entry into
-`.vscode/launch.json`. It prints JSON; check `ok` and `problems`.
+The script strips `torchrun`/`accelerate`/`deepspeed`, rewrites the program's own
+process-count flags (`--gpus`, `--world-size`, `--num-processes`, `--devices`,
+`--tensor-parallel-size`, …) to 1, pins `CUDA_VISIBLE_DEVICES` to a single device,
+supplies the rank environment `torch.distributed` needs for a one-rank world, sets
+`justMyCode: false`, infers the project interpreter, applies your shrink overrides, and
+merges one entry into `.vscode/launch.json`. It prints JSON; check `ok`, `problems`, and
+`forced_single` — the last lists every value it changed to get the world down to one
+process, so you can mention them in the doc.
 
 Two things decide whether the result is actually usable:
 
-**Collapse to one process.** A multi-rank job stops every rank at the same breakpoint and
-needs a debugger each. Single-process is the difference between steppable and not. The
-script handles the mechanics; you confirm the code tolerates `WORLD_SIZE=1` — most FSDP and
-DDP code does, but a script that hardcodes a device count or asserts `world_size > 1` needs
-that noted in the doc.
+**Collapse to one process, and prove it collapsed.** A multi-GPU job stops every rank at
+the same breakpoint — eight GPUs means stepping through the same stop eight times — so the
+debug config must run exactly one process. The script forces every path it can see:
+launcher stripped, the program's own fan-out flags rewritten to 1, one visible CUDA device
+(which also collapses code that shards by `torch.cuda.device_count()`), one-rank env. What
+it cannot see it cannot fix: it refuses shell-script wrappers (extract the inner command
+and convert that), and a hardcoded device count, an `mp.spawn` keyed to something it does
+not rewrite, or an `assert world_size > 1` all need you to read the entry point — most FSDP
+and DDP code tolerates `WORLD_SIZE=1`, but note the exceptions in the doc. The acceptance
+test is behavioural: start the config, and the first breakpoint must be hit **exactly
+once**. If it pops N times, something still fans out — DataLoader workers running dataset
+code are the usual leftover (`--override num_workers=0`).
 
 **Shrink until one pass takes seconds.** Turn down steps, batch, resolution, dataset size —
 whatever makes a full pass through the interesting code fast. Then say in a comment that

@@ -7,6 +7,14 @@ one debugger per rank. So the launcher is stripped and the program is run direct
 single process, with the rank environment `torch.distributed` expects supplied by hand.
 That turns N processes into one, which is what makes stepping possible at all.
 
+Stripping the launcher is not enough on its own: plenty of jobs fan out on their own
+authority -- mp.spawn(nprocs=args.gpus), Lightning --devices, vLLM --tensor-parallel-size,
+or a bare `python train.py --world-size 8` with no launcher at all. So unless
+--keep-multiproc is passed, the program's own process-count flags are rewritten to 1,
+CUDA_VISIBLE_DEVICES is pinned to a single device (which also collapses code that shards
+by torch.cuda.device_count()), and every change is reported under `forced_single` so the
+caller can sanity-check what was forced.
+
     python3 scripts/make_debug_config.py \
         --name "train tiny (debug, 1 proc)" \
         --command '.venv/bin/torchrun --standalone --nproc-per-node=2 train.py --steps 100' \
@@ -35,6 +43,18 @@ LAUNCHER_VALUE_FLAGS = (
     "--num_machines", "--config_file", "--main_process_port", "-n", "-np",
 )
 
+# Program-owned flags that set how many processes/devices the job shards itself across.
+# The launcher's flags are already dropped with the launcher; these belong to the program
+# and survive that, so they are rewritten to 1 when collapsing -- otherwise a script that
+# calls mp.spawn(nprocs=args.gpus) still stops every breakpoint once per GPU.
+WORLD_SIZE_FLAGS = (
+    "--gpus", "--num-gpus", "--num_gpus", "--ngpu", "--ngpus",
+    "--world-size", "--world_size", "--num-processes", "--num_processes",
+    "--nproc", "--nprocs", "--devices",
+    "--tensor-parallel-size", "--tensor_parallel_size",
+    "--pipeline-parallel-size", "--pipeline_parallel_size",
+)
+
 # What torch.distributed reads to form a one-rank world. Without these, a script that
 # calls init_process_group either hangs waiting for peers or fails outright.
 SINGLE_PROC_ENV = {
@@ -55,7 +75,7 @@ DEFAULT_ENV = {
 
 
 def parse_command(tokens):
-    """Split a shell command into (interpreter, module, program, args, launcher)."""
+    """Split a shell command into (interpreter, module, program, args, launcher, inline_env)."""
     interpreter = None
     launcher = None
     i = 0
@@ -110,7 +130,41 @@ def parse_command(tokens):
         program = tokens[i]
         i += 1
 
-    return interpreter, module, program, tokens[i:], launcher
+    return interpreter, module, program, tokens[i:], launcher, inline_env
+
+
+def force_single_process(args_list):
+    """Rewrite the program's own process/device-count flags to 1.
+
+    Returns (new_args, forced) where forced records each rewrite. Values are always
+    forced to "1" rather than to the first element of a list: `--devices 0,1` means
+    device *indices*, and collapsing it to "0" would read as "zero devices" to half
+    the CLIs out there. One process on one device is the point; which physical device
+    that is belongs to CUDA_VISIBLE_DEVICES.
+    """
+    out = list(args_list)
+    forced = []
+    i = 0
+    while i < len(out):
+        token = out[i]
+        flag = value = None
+        inline = False
+        if token in WORLD_SIZE_FLAGS and i + 1 < len(out) and not out[i + 1].startswith("-"):
+            flag, value = token, out[i + 1]
+        else:
+            for candidate in WORLD_SIZE_FLAGS:
+                if token.startswith(candidate + "="):
+                    flag, value, inline = candidate, token[len(candidate) + 1:], True
+                    break
+        # "0" is a CPU/none selection, not a fan-out; leave it alone.
+        if flag and value not in ("", "0", "1"):
+            if inline:
+                out[i] = f"{flag}=1"
+            else:
+                out[i + 1] = "1"
+            forced.append(f"{flag} {value} -> 1")
+        i += 1
+    return out, forced
 
 
 def apply_overrides(args, overrides):
@@ -159,23 +213,49 @@ def main():
                         help="Working directory for the debug run. Set this when the command runs from a subdirectory "
                              "and its arguments use paths relative to it, e.g. ${workspaceFolder}/subproject.")
     parser.add_argument("--keep-multiproc", action="store_true",
-                        help="Keep the launcher instead of collapsing to one process. Rarely what you want.")
+                        help="Skip the single-process collapse (one-rank env, flag rewrites, CUDA device pin). "
+                             "Breakpoints will then stop once per rank. Rarely what you want.")
     parser.add_argument("--launch-json", default=".vscode/launch.json", help="Path relative to the repo.")
     parser.add_argument("--dry-run", action="store_true", help="Print the config; write nothing.")
     args = parser.parse_args()
 
     repo = Path(args.repo).expanduser().resolve() if args.repo else Path.cwd()
-    interpreter, module, program, program_args, launcher = parse_command(shlex.split(args.command))
+    interpreter, module, program, program_args, launcher, inline_env = parse_command(shlex.split(args.command))
 
     if not module and not program:
         print(json.dumps({"ok": False, "error": "could not find a program or -m module in the command"}, indent=2))
         return 2
 
+    problems = []
+    if program and (Path(program).name in ("bash", "sh", "zsh", "fish", "env") or program.endswith(".sh")):
+        # A wrapper script can hide a launcher or an mp.spawn fan-out where none of the
+        # rewrites below can reach it, so single-process cannot be guaranteed. Refuse
+        # rather than emit a config that stops every breakpoint once per GPU.
+        problems.append(
+            f"'{program}' is a shell wrapper: extract the command it actually runs and convert that instead"
+        )
+
     program_args = apply_overrides(program_args, args.override)
 
+    # Collapse by default, launcher or not -- a bare `python train.py --gpus 8` that
+    # calls mp.spawn fans out exactly like a torchrun job does.
+    collapse = not args.keep_multiproc
+    forced = []
+    if collapse:
+        program_args, forced = force_single_process(program_args)
+
     env = dict(DEFAULT_ENV)
-    if launcher and not args.keep_multiproc:
+    env.update(inline_env)
+    if collapse:
+        for key, value in SINGLE_PROC_ENV.items():
+            if key in inline_env and inline_env[key] != value:
+                forced.append(f"env {key}={inline_env[key]} -> {value}")
         env.update(SINGLE_PROC_ENV)
+        cvd = env.get("CUDA_VISIBLE_DEVICES", "")
+        if "," in cvd:
+            first = cvd.split(",")[0].strip() or "0"
+            forced.append(f"env CUDA_VISIBLE_DEVICES={cvd} -> {first}")
+            env["CUDA_VISIBLE_DEVICES"] = first
     for raw in args.env:
         key, _, value = raw.partition("=")
         if key:
@@ -215,7 +295,6 @@ def main():
         elif (repo / candidate).is_file():
             config["python"] = "${workspaceFolder}/" + candidate.as_posix().removeprefix("./")
 
-    problems = []
     if "program" in config:
         target = repo / config["program"].replace("${workspaceFolder}/", "")
         if not target.is_file():
@@ -228,7 +307,8 @@ def main():
     summary = {
         "ok": not problems,
         "launcher_stripped": launcher,
-        "single_process": bool(launcher) and not args.keep_multiproc,
+        "single_process": collapse,
+        "forced_single": forced,
         "config_name": args.name,
         "launch_json": str(repo / args.launch_json),
         "problems": problems,
