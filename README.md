@@ -7,6 +7,7 @@ want.
 | --- | --- |
 | [**vscode-debug**](plugins/vscode-debug/README.md) | Places **real breakpoints** in the VS Code / Cursor gutter from a terminal — no injected `breakpoint()` calls — and turns a command that already works into a steppable walkthrough of the code |
 | [**kiss-rules**](plugins/kiss-rules/README.md) | Injects three standing rules into every session: keep code simple, never commit unless asked, and no authorship trailers in commit messages |
+| [**user-sleep**](plugins/user-sleep/README.md) | Tell Claude you're going to sleep: from then on it never asks questions or waits for input — it decides with best judgment, keeps working, and leaves a "while you were asleep" decision log |
 
 ## Install
 
@@ -14,6 +15,7 @@ want.
 /plugin marketplace add EricWang12/zw-claude-skills
 /plugin install vscode-debug@zw-claude-skills
 /plugin install kiss-rules@zw-claude-skills
+/plugin install user-sleep@zw-claude-skills
 ```
 
 The marketplace only needs adding once; after that, new plugins here are one
@@ -53,6 +55,10 @@ plugins/
     rules/RULES.md                   the rules themselves; edit this one file
     hooks/hooks.json                 SessionStart -> inject the rules
     hooks/session-start
+  user-sleep/
+    .claude-plugin/plugin.json
+    README.md
+    skills/user-sleep/               goodnight: no questions, best-judgment mode
 docs/AGENT-GUIDE.md                  how terminal-driven breakpoints work, portably
 install.sh                           manual install of every plugin's skills
 ```

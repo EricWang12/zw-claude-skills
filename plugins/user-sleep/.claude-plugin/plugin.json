@@ -1,0 +1,9 @@
+{
+  "name": "user-sleep",
+  "description": "Tell the agent you are going to sleep: from then on it asks nothing and blocks on nothing — it makes best-judgment decisions, keeps working, and leaves a decision log to review in the morning.",
+  "version": "0.1.0",
+  "author": {
+    "name": "EricWang12"
+  },
+  "license": "MIT"
+}
