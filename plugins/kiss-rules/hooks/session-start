@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Inject rules/RULES.md into the session context.
+#
+# The matcher in hooks.json fires on startup, /clear and compaction, so the rules
+# are re-injected rather than quietly evaporating partway through a long session.
+set -euo pipefail
+
+ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+RULES="$ROOT/rules/RULES.md"
+
+if [ ! -f "$RULES" ]; then
+    echo "kiss-rules: no rules file at $RULES" >&2
+    exit 1
+fi
+
+# python3 does the JSON escaping, because hand-rolling it in bash is exactly the
+# kind of thing rule 1 is about.
+python3 -c '
+import json, sys
+
+with open(sys.argv[1]) as handle:
+    rules = handle.read()
+
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": rules,
+    }
+}))
+' "$RULES"

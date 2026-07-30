@@ -1,0 +1,9 @@
+{
+  "name": "kiss-rules",
+  "description": "KISS rules, injected into every session: keep code simple and stupid, never commit unless asked, and no authorship trailers in commit messages.",
+  "version": "0.1.0",
+  "author": {
+    "name": "YOUR-GITHUB-USERNAME"
+  },
+  "license": "MIT"
+}

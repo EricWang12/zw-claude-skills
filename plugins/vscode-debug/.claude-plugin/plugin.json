@@ -1,0 +1,9 @@
+{
+  "name": "vscode-debug",
+  "description": "Place real VS Code / Cursor breakpoints from the terminal — the red dots in the gutter, not injected breakpoint() calls — and turn a command that works into a steppable walkthrough of the code.",
+  "version": "0.2.0",
+  "author": {
+    "name": "YOUR-GITHUB-USERNAME"
+  },
+  "license": "MIT"
+}

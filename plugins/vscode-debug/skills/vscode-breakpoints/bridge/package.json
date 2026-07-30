@@ -1,0 +1,68 @@
+{
+  "name": "agent-breakpoints",
+  "displayName": "Agent Breakpoints",
+  "description": "Sync real VS Code / Cursor source breakpoints from a JSON manifest a terminal agent can write.",
+  "version": "0.2.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Debuggers",
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentBreakpoints.sync",
+        "title": "Agent Breakpoints: Sync from manifest",
+        "icon": "$(debug-breakpoint)"
+      },
+      {
+        "command": "agentBreakpoints.clear",
+        "title": "Agent Breakpoints: Clear agent-managed breakpoints"
+      },
+      {
+        "command": "agentBreakpoints.reveal",
+        "title": "Agent Breakpoints: Show manifest"
+      },
+      {
+        "command": "agentBreakpoints.diagnose",
+        "title": "Agent Breakpoints: Diagnose (show log)"
+      }
+    ],
+    "configuration": {
+      "title": "Agent Breakpoints",
+      "properties": {
+        "agentBreakpoints.manifestPath": {
+          "type": "string",
+          "default": ".vscode/breakpoints.json",
+          "description": "Workspace-relative path to the breakpoint manifest."
+        },
+        "agentBreakpoints.autoSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-sync automatically whenever the manifest changes on disk."
+        },
+        "agentBreakpoints.syncOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sync once when the window finishes loading."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "~1.75.0",
+    "typescript": "^5.4.0"
+  }
+}
