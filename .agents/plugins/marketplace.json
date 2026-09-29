@@ -1,0 +1,56 @@
+{
+  "name": "zw-claude-skills",
+  "interface": {
+    "displayName": "ZW Skills"
+  },
+  "plugins": [
+    {
+      "name": "vscode-debug",
+      "source": {
+        "source": "local",
+        "path": "./plugins/vscode-debug"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "kiss-rules",
+      "source": {
+        "source": "local",
+        "path": "./plugins/kiss-rules"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "user-sleep",
+      "source": {
+        "source": "local",
+        "path": "./plugins/user-sleep"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "reproduce",
+      "source": {
+        "source": "local",
+        "path": "./plugins/reproduce"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

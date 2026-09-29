@@ -19,6 +19,9 @@ to understand an unfamiliar codebase by stepping through one real run of it.
 
 ## Requirements
 
+Install in Claude Code or Codex using the [repository installation instructions](../../README.md#install).
+Both hosts load the same two skills and bundled editor bridge.
+
 - **VS Code or Cursor** (or code-server). Local or over Remote-SSH; both work.
 - **Python 3.8+** — that is the whole install. The bridge extension is committed
   pre-compiled, so no Node toolchain is needed unless you want to modify it.

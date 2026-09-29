@@ -1,0 +1,9 @@
+{
+  "name": "reproduce",
+  "description": "Point it at a GitHub repo or project page and it gets the code running: clone, short-named env, the biggest model variant that fits the free GPU memory, at least three verified demos, and a flow artifact where the real examples ride through the flowchart.",
+  "version": "0.1.0",
+  "author": {
+    "name": "EricWang12"
+  },
+  "license": "MIT"
+}

@@ -72,11 +72,15 @@ is needed.
 
 ## Install
 
-As a plugin, from the repo root that contains this directory:
+For Codex, follow the [Codex installation instructions](../../README.md#codex) and
+review and trust the hook with `/hooks`. Codex uses this same hook configuration,
+script, and rules file, including the `CLAUDE_PLUGIN_ROOT` compatibility variable.
+
+For Claude Code, install from this repository's marketplace:
 
 ```
-/plugin marketplace add YOUR-GITHUB-USERNAME/skill-vscode-debug
-/plugin install kiss-rules@claude-plugins
+/plugin marketplace add EricWang12/zw-claude-skills
+/plugin install kiss-rules@zw-claude-skills
 ```
 
 Without the plugin system, register the hook yourself in `~/.claude/settings.json`, using

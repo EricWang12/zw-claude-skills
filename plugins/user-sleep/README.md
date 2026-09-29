@@ -1,8 +1,8 @@
 # user-sleep
 
-One skill: tell Claude you are going to sleep, and it stops asking.
+One skill: tell Claude Code or Codex you are going to sleep, and it stops asking.
 
-Say "I'm going to bed, finish the refactor" (or `/user-sleep`, or "going AFK", "have it
+Say "I'm going to bed, finish the refactor" (or select the skill, or "going AFK", "have it
 ready by morning") and from that point on the agent treats every question as what it
 really is while you are unavailable — a full stop that blocks the work until you wake.
 Instead of asking, it:
@@ -29,12 +29,15 @@ Two honest limits.
 asking, but nothing mechanically prevents a question.
 
 **It cannot suppress the harness's own permission prompts.** If a tool call needs
-approval under your current permission settings, Claude Code will still stop and wait —
+approval under your current permission settings, Claude Code or Codex will still stop and wait —
 the skill only tells the model to prefer routes that avoid new approvals. For a truly
 unattended run, set the permission mode you are comfortable with (`/permissions`, or
 auto-accept edits) before you log off.
 
 ## Install
+
+For Codex, follow the [Codex installation instructions](../../README.md#codex).
+Both hosts load the same `skills/user-sleep/SKILL.md`.
 
 As a plugin, from the marketplace this repo publishes:
 
