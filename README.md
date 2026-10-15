@@ -10,6 +10,7 @@ and rules from `plugins/`.
 | [**kiss-rules**](plugins/kiss-rules/README.md) | Injects three standing rules into every session: keep code simple, never commit unless asked, and no authorship trailers in commit messages |
 | [**user-sleep**](plugins/user-sleep/README.md) | Tell the agent you're going to sleep: from then on it never asks questions or waits for input — it decides with best judgment, keeps working, and leaves a "while you were asleep" decision log |
 | [**reproduce**](plugins/reproduce/README.md) | Paste a GitHub repo or project page: it clones, builds a short-named env, picks the biggest model that fits the *free* GPU memory, runs ≥3 verified demos, and publishes a flow artifact where the real examples ride through the flowchart |
+| [**paper-explain**](plugins/paper-explain/README.md) | Paste a paper link: it files the PDF into your project library, crops the authors' figures, and writes a visual explainer — the problem shown on one running example, then big picture → stages → details — published as a page of one shared artifact, with the library synced to its GitHub repo |
 
 ## Install
 
@@ -21,6 +22,7 @@ and rules from `plugins/`.
 /plugin install kiss-rules@zw-claude-skills
 /plugin install user-sleep@zw-claude-skills
 /plugin install reproduce@zw-claude-skills
+/plugin install paper-explain@zw-claude-skills
 ```
 
 The marketplace only needs adding once; after that, new plugins here are one
@@ -36,6 +38,7 @@ codex plugin add vscode-debug@zw-claude-skills
 codex plugin add kiss-rules@zw-claude-skills
 codex plugin add user-sleep@zw-claude-skills
 codex plugin add reproduce@zw-claude-skills
+codex plugin add paper-explain@zw-claude-skills
 ```
 
 Once the Codex support files are published to GitHub, the first command can instead be:
@@ -49,7 +52,7 @@ desktop app's Plugins Directory and install from there. Use a current Codex clie
 plugin support; `codex plugin --help` lists the commands your version provides.
 
 Ask naturally to use a workflow, or select `codeflow`, `vscode-breakpoints`, `user-sleep`,
-or `reproduce` from Codex's skills picker. `kiss-rules` is a session hook, so it does not
+`reproduce` or `paper-explain` from Codex's skills picker. `kiss-rules` is a session hook, so it does not
 add a skill. In the Codex CLI, open `/hooks` to review and trust its hook before relying
 on the rules; installation alone does not trust hooks. It requires Bash and Python 3.
 
@@ -113,6 +116,11 @@ plugins/
     .codex-plugin/plugin.json
     README.md
     skills/reproduce/                repo link -> clone, env, best-fit model, 3 demos, flow artifact
+  paper-explain/
+    .claude-plugin/plugin.json
+    .codex-plugin/plugin.json
+    README.md
+    skills/paper-explain/            paper link -> filed PDF, figure crops, explainer page, artifact, git push
 docs/AGENT-GUIDE.md                  how terminal-driven breakpoints work, portably
 install.sh                           manual install of every plugin's skills
 ```

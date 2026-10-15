@@ -23,6 +23,11 @@
       "name": "reproduce",
       "source": "./plugins/reproduce",
       "description": "Point it at a GitHub repo or project page and it gets the code running: clone, short-named env, the biggest model that fits the free GPU memory, at least three verified demos, and a flow artifact where the real examples ride through the flowchart."
+    },
+    {
+      "name": "paper-explain",
+      "source": "./plugins/paper-explain",
+      "description": "Paste a paper link: it files the PDF into your project library, crops the authors' figures, and writes a visual explainer (the problem shown on one running example, then big picture, stages and details), published as a page of one shared artifact and synced to the library's GitHub repo."
     }
   ]
 }
