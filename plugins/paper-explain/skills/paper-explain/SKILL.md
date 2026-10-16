@@ -72,9 +72,10 @@ it from the page's `paper:pdf` link.
 
 ## 2. Name it, pick the project, download
 
-- **Short name**: the method's own name, usually the word before the colon in the title
-  (`DexAgent`). If there is none, use 1–3 CamelCase words for the key idea. Letters,
-  digits and hyphens only.
+- **Short name**: the name the user calls the paper by, if they use one, such as its code
+  or framework name (`RPent` for the Harness VLA paper). Otherwise the method's own
+  name, usually the word before the colon in the title (`DexAgent`). If there is none,
+  use 1–3 CamelCase words for the key idea. Letters, digits and hyphens only.
 - **Name**: `<YYYY-MM-DD>-<Short>`, with today's date (the day it was retrieved, not the
   publication date). The PDF, the page and the figure folder all use this exact name.
 - **Project**: compare the abstract with each project's scope line in the profile and
