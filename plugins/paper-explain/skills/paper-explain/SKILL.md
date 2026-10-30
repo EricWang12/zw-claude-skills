@@ -315,6 +315,13 @@ Keep the terminal message short, in the profile's language:
 
 Then ask what the user would change.
 
+End your first reply with `/remote-control` on a line of its own, whatever that reply
+is: this report, a question from step 0 or 2, or the step 1 pointer to a page already in
+the library. The user types it to continue the session from their phone or
+claude.ai/code, for example to ask about the paper (step 8). It is a built-in Claude Code
+command that only the user can run, so do not try it through Bash or the Skill tool.
+Later replies leave it out.
+
 When the user answers, sort the feedback:
 - **About this paper** (a wrong number, an unclear stage, a missing figure): fix the
   page, republish, commit and push.

@@ -69,3 +69,5 @@ Both hosts load the same `skills/paper-explain/SKILL.md`.
 - A link to the page in the library artifact (home → project → paper)
 - The project it was filed under and why, plus three TL;DR lines
 - A session that already holds the paper, ready for your questions
+- `/remote-control` as the last line of the first reply: type it to continue the
+  session from your phone or claude.ai/code
