@@ -4,7 +4,8 @@
      the reader's order (preferences.md). Figures live in artifact/<name>/ next to this file.
      This page loads Mermaid itself: pages other than the library home are served without the
      artifact skeleton, so nothing else draws the charts. In chart labels write class='ex'
-     with single quotes. -->
+     with single quotes. {{Project}} is the project's name from the profile's table
+     (Robotic harness); {{Project folder}} is its folder (Robotic-harness). -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -72,6 +73,7 @@ ul.tight li + li { margin-top: .3rem; }
 b, strong { font-weight: 700; }
 .muted { color: var(--muted); }
 .ex { font-family: var(--f-mono); font-size: .86em; color: var(--ex); background: var(--ex-bg); padding: 0 .3em; border-radius: 3px; }
+.ex, code { overflow-wrap: anywhere; }  /* long commands and paths must not widen the page on a phone */
 span.gap { color: var(--gap); font-weight: 700; }
 span.win { color: var(--win); font-weight: 700; }
 .table-wrap { overflow-x: auto; }
@@ -108,7 +110,12 @@ section { padding-block: 2.25rem; border-top: 1px solid var(--rule); scroll-marg
 table.grid { width: 100%; border-collapse: collapse; font-size: .93rem; margin: 1rem 0; }
 table.grid th, table.grid td { text-align: left; padding: .5rem .6rem; border-top: 1px solid var(--rule); vertical-align: top; }
 table.grid th { font: 500 .72rem var(--f-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-top: 0; }
-table.baselines td:last-child { white-space: nowrap; }
+#related { margin-top: 1.75rem; scroll-margin-top: 3.5rem; }
+/* fixed columns keep every page's table the same shape; on a phone it scrolls inside .table-wrap */
+table.related { table-layout: fixed; min-width: 720px; }
+table.related tr:first-child th:nth-child(1) { width: 22%; }
+table.related tr:first-child th:nth-child(2), table.related tr:first-child th:nth-child(3) { width: 24%; }
+table.related tr.group th { font: 700 .85rem var(--f-display); letter-spacing: .02em; text-transform: none; color: var(--accent); border-top: 1px solid var(--rule); padding-top: .9rem; }
 .note { font-size: .85rem; color: var(--muted); margin: -.4rem 0 0; }
 .crux { font-size: 1.05rem; margin: 1rem 0 0; }
 
@@ -161,7 +168,6 @@ footer { border-top: 1px solid var(--rule); padding-block: 1.5rem 3rem; font-siz
 @media (max-width: 560px) {
   .tldr dl > div { grid-template-columns: minmax(0, 1fr); gap: .1rem; }
   .crumb .proj { display: none; }
-  table.baselines td:last-child { white-space: normal; }
 }
 </style>
 </head>
@@ -171,7 +177,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 1.5rem 3rem; font-siz
   <div class="frame">
     <span class="crumb"><a href="../../index.html">Library</a><span class="proj"> / {{Project folder}}</span></span>
     <div class="jump">
-      <a href="#tldr">TL;DR</a><a href="#problem">Problem</a><a href="#l1">Big picture</a>
+      <a href="#tldr">TL;DR</a><a href="#problem">Problem</a><a href="#related">Related work</a><a href="#l1">Big picture</a>
       <a href="#l2">Stages</a><a href="#l3">Details</a><a href="#results">Results</a>
       <a href="#limits">Limits</a><a href="#for-you">For you</a>
     </div>
@@ -209,22 +215,30 @@ footer { border-top: 1px solid var(--rule); padding-block: 1.5rem 3rem; font-siz
     <p><b>{{例子名}}</b>：{{输入，具体到值：<span class="ex">…</span>}} → 想要：{{期望的输出}}</p>
   </div>
   <!-- One lane per baseline family, run on the example's input, ending at the exact step
-       where it breaks on this example (:::gap) with the visible symptom. -->
+       where it breaks on this example (:::gap) with the visible symptom and its number. -->
   <div class="flow"><pre>
 flowchart LR
   IN["<b>例子输入</b><br/><span class='ex'>{{input}}</span>"] --> A1["<b>{{Baseline A}}</b><br/>{{它的做法}}"]
-  A1 --> AX["{{在例子上坏在哪}}<br/><span class='ex'>{{具体现象}}</span>"]:::gap
+  A1 --> AX["{{在例子上坏在哪}}<br/><span class='ex'>{{具体现象，数字}}</span>"]:::gap
   IN --> B1["<b>{{Baseline B}}</b><br/>{{它的做法}}"]
-  B1 --> BX["{{在例子上坏在哪}}<br/><span class='ex'>{{具体现象}}</span>"]:::gap
+  B1 --> BX["{{在例子上坏在哪}}<br/><span class='ex'>{{具体现象，数字}}</span>"]:::gap
   </pre></div>
+  <p class="note">{{"坏在哪"是推断的那几条：依据 §…，论文实际只报告了什么；没有推断就删掉这行}}</p>
+  <p class="crux"><b>根本问题：</b>{{一句话}}　<b>这篇的切入点：</b>{{一句话}}</p>
+  <h3 id="related">Related work</h3>
+  <!-- Families the paper compares itself with, closest first; the flowchart's baselines come
+       first. 同一问题: other ways to solve this problem. 相似做法: this kind of method, used on
+       another problem. Drop a group that has no rows. Each cell a phrase. -->
   <div class="table-wrap">
-    <table class="grid baselines">
-      <tr><th>Baseline</th><th>怎么做</th><th>在例子上哪里坏</th><th>结果</th></tr>
-      <tr><td>{{family（具体方法名）}}</td><td>{{一行}}</td><td>{{一行，具体到例子}}</td><td>{{数字（出处）}}</td></tr>
+    <table class="grid related">
+      <tr><th>相关工作</th><th>解决什么</th><th>怎么解决</th><th>和本文的区别</th></tr>
+      <tr class="group"><th colspan="4">同一问题 · 别的解法</th></tr>
+      <tr><td><b>{{family}}</b><br><span class="muted">{{代表方法}}</span></td><td>{{短语}}</td><td>{{短语}}</td><td>{{它缺什么 → 本文怎么做}}</td></tr>
+      <tr class="group"><th colspan="4">相似做法 · 别的问题</th></tr>
+      <tr><td><b>{{family}}</b><br><span class="muted">{{代表方法}}</span></td><td>{{短语}}</td><td>{{短语}}</td><td>{{它缺什么 → 本文怎么做}}</td></tr>
     </table>
   </div>
-  <p class="note">{{"哪里坏"如果是推断：写明依据（§…）和论文实际只报告了什么；不是推断就删掉这行}}</p>
-  <p class="crux"><b>根本问题：</b>{{一句话}}　<b>这篇的切入点：</b>{{一句话}}</p>
+  <p class="note">{{来源：论文 §N Related Work（和 §… 的对比），未另行检索}}</p>
 </section>
 
 <section id="l1">

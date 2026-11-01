@@ -1,7 +1,7 @@
 # paper-explain
 
-Paste a paper link (arXiv, project page, OpenReview, any PDF) and say "help me understand
-this". The skill:
+Paste a paper link (arXiv, project page, OpenReview, any PDF) or a tool's GitHub release
+and say "help me understand this". The skill:
 
 1. **Syncs the library first.** The library is a git clone of your papers repo. It
    pulls before doing anything, so agents on every machine work in the same library.
@@ -16,13 +16,16 @@ this". The skill:
    in the reader's style from `preferences.md`:
    - the problem told on one running example: what each baseline does and exactly
      where it breaks;
+   - a related-work table: what each neighbor solves, how, and how this paper differs,
+     taken from the paper's own related-work section unless you ask for a deeper search;
    - then big picture → stages → per-stage details;
    - flowcharts that carry the example's values;
    - the original figures, explained region by region.
 5. **Checks the page** in headless Chromium (`check_page.py`): every flowchart draws and
    fits, and nothing scrolls sideways on a phone.
 6. **Publishes it as a page of one artifact**, whose home page mirrors the folder tree.
-   It finds the artifact by its title, so every machine publishes into the same one.
+   It finds the artifact by its title in your artifact list, so every machine publishes
+   into the same one, and creates it if the list has none.
 7. **Commits and pushes** the library, then loads the paper into the session so it can
    answer your follow-up questions.
 
@@ -60,6 +63,8 @@ Both hosts load the same `skills/paper-explain/SKILL.md`.
 > help me understand this paper https://arxiv.org/abs/2609.35318
 
 > add this to my library: https://dexagent1.github.io
+
+> what changed in this release? https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0
 
 > TL;DR this one for the real-to-sim project https://openreview.net/forum?id=...
 

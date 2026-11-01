@@ -15,9 +15,9 @@ OUT/figures.json, and prints one line per crop.
 
 This is a heuristic. Open every crop before you use it. Fix a bad crop with
 --box ID=PAGE:x0,y0,x1,y1 (PDF points, origin top-left); a new ID such as
-fig2-s1 adds a crop, for example one panel of a figure. --page N writes
-OUT/pageN.png at 72 dpi, where one pixel is one point, so you can read
-coordinates straight off it.
+fig2-s1 adds a crop, for example one panel of a figure. --page N prints the
+page's text blocks and images with their coordinates, and writes OUT/pageN.png
+at 72 dpi, where one pixel is one point.
 
 Usage:
   uv run extract_figures.py paper.pdf OUT_DIR [--box fig3=5:313,45,558,196] [--page 5]
@@ -85,6 +85,8 @@ def find_crops(doc):
     starts = Counter(round(b["rect"].x0) for b in paras)
     columns = [(x, x + col_w) for x, c in starts.items() if c >= 3] or [(text_x0, text_x1)]
     is_body = lambda b: is_body_size(b) and b["rect"].width >= 0.8 * col_w
+    # a paragraph starts at a column's left edge; a centered table row in body-size type does not
+    at_edge = lambda b: any(abs(b["rect"].x0 - x) <= 3 for x, _ in columns)
 
     crops, taken = {}, {}  # taken: page index -> rects already claimed
     for kind in ("table", "fig"):  # tables first, so figures stop at them
@@ -105,7 +107,7 @@ def find_crops(doc):
                     x0, x1 = next(((a, b) for a, b in columns if a - 5 <= mid <= b + 5), (c.x0, c.x1))
                 in_span = lambda r: min(r.x1, x1) - max(r.x0, x0) > 0.3 * max(r.width, 1)
                 stops = [b["rect"] for b in page["blocks"] if b is not cap and in_span(b["rect"]) and (
-                    is_body(b) or CAPTION.match(b["first"])
+                    (is_body(b) and (kind == "fig" or at_edge(b))) or CAPTION.match(b["first"])
                     or b["rect"].y1 <= top + 2 or b["rect"].y0 >= bottom - 2)]
                 stops += [r for r in taken.get(pi, []) if in_span(r)]
                 above = pymupdf.Rect(x0 - 6, max([s.y1 for s in stops if s.y1 <= c.y0 + 1] + [0]), x1 + 6, c.y0)
@@ -124,19 +126,33 @@ def find_crops(doc):
 
 
 def content_box(page, area, cap, kind):
-    """Union of graphics inside `area`, grown to the text labels that touch it."""
+    """Union of graphics inside `area`, grown to the text labels that touch it.
+
+    A table instead grows from its caption through the rows and rules that touch, so a
+    figure further along the same column stays out of the table's crop."""
     inside = lambda r: (r & area).get_area() >= 0.5 * max(r.get_area(), 1) or (r.height < 1 and r in area)
-    box = pymupdf.Rect()
-    for r in page["gfx"]:
-        if inside(r):
-            box |= r
+    gfx = [r for r in page["gfx"] if inside(r)]
     labels = [b["rect"] for b in page["blocks"] if b is not cap and inside(b["rect"])]
-    if box.is_empty and kind == "fig":
-        return None
-    for _ in range(3):  # labels can chain: axis title next to tick labels next to the plot
-        for r in labels:
-            if box.is_empty or (r + (-12, -12, 12, 12)).intersects(box):
-                box |= r
+    box = pymupdf.Rect()
+    if kind == "table":
+        reach = cap["rect"] + (0, -15, 0, 15)
+        while True:
+            grown = pymupdf.Rect()
+            for r in gfx + labels:
+                if (r + (-12, -12, 12, 12)).intersects(reach):
+                    grown |= r
+            if grown.is_empty or grown == box:
+                break
+            box = reach = grown
+    else:
+        for r in gfx:
+            box |= r
+        if box.is_empty:
+            return None
+        for _ in range(3):  # labels can chain: axis title next to tick labels next to the plot
+            for r in labels:
+                if (r + (-12, -12, 12, 12)).intersects(box):
+                    box |= r
     return None if box.is_empty else (box + (-3, -3, 3, 3)) & area
 
 
@@ -151,8 +167,13 @@ def main():
     doc = pymupdf.open(a.pdf)
 
     for n in a.page:
-        doc[n - 1].get_pixmap(dpi=72).save(a.out / f"page{n}.png")
-        print(f"page {n} -> {a.out / f'page{n}.png'} (1 px = 1 pt)")
+        page = doc[n - 1]
+        page.get_pixmap(dpi=72).save(a.out / f"page{n}.png")
+        print(f"page {n} -> {a.out / f'page{n}.png'} (1 px = 1 pt); boxes are x0,y0,x1,y1")
+        items = [(b["rect"], "text ", b["text"][:70]) for b in text_blocks(page)]
+        items += [(pymupdf.Rect(i["bbox"]), "image", "") for i in page.get_image_info()]
+        for r, kind, text in sorted(items, key=lambda it: (it[0].y0, it[0].x0)):
+            print(f"  {kind} [{r.x0:.0f},{r.y0:.0f},{r.x1:.0f},{r.y1:.0f}] {text}")
 
     crops = find_crops(doc)
     for spec in a.box:

@@ -1,11 +1,11 @@
 ---
 name: paper-explain
-description: Explain a research paper the way this user learns best, and file it in their paper library. Given a paper link (arXiv abs/pdf, project page, OpenReview, any PDF URL) it downloads the PDF into the right project folder under a dated short name (2026-10-15-DexAgent), reads the whole paper, crops and inspects the authors' figures, and writes a visual page - the problem told on one running example (what each baseline does and where it breaks), then big picture → stages → per-stage detail with flowcharts, the original figures explained part by part. The page is saved next to the PDF, published into the user's single library artifact (Zhaoning Paper Pile), and the library is pulled from and pushed to its GitHub repo so every machine stays in sync. Use this whenever the user shares a paper or project-page link, or asks to read, explain, summarize, break down, TL;DR or "help me understand" a paper, or to add a paper to the library - even if they never say "explain".
+description: Explain a research paper or tool the way this user learns best, and file it in their paper library. Given a paper link (arXiv abs/pdf, project page, OpenReview, any PDF URL) or a tool's GitHub repo or release, it downloads the PDF into the right project folder under a dated short name (2026-10-15-DexAgent), reads the whole paper, crops and inspects the authors' figures, and writes a visual page - the problem told on one running example (where each baseline breaks), a concise related-work table (what each neighbor solves, how, and how this paper differs), then big picture → stages → per-stage detail with flowcharts, the original figures explained part by part. The page is saved next to the PDF, added as a new page of the user's single library artifact (Zhaoning Paper Pile, found by its title in the artifact list and created if missing), and the library is pulled from and pushed to its GitHub repo so every machine stays in sync. Use this whenever the user shares a paper, project-page or tool-release link, or asks to read, explain, summarize, break down, TL;DR or "help me understand" a paper or tool, or to add one to the library - even if they never say "explain".
 ---
 
 # Paper explain
 
-The user hands you a paper; you hand back understanding. Three things come out of every
+The user hands you a paper; you hand back understanding. Four things come out of every
 run:
 
 1. The PDF, filed in the right project folder under a short dated name.
@@ -38,7 +38,7 @@ Read `<root>/preferences.md`, the reader's profile. It lives in the library so t
 every machine shares it. It holds:
 - how this user learns, including the page language;
 - their projects, which decide the folder;
-- the library repo, the artifact's title and its URL.
+- the library repo and the artifact's title.
 
 If the library has no profile yet, ask the user how they like papers explained and what
 their projects are, and write the profile with the sections "How I learn", "My
@@ -60,6 +60,11 @@ project, which you pick in step 2.
   and abstract, and its comment field often names the venue and the project page.
 - A project page → fetch it and take the paper link (arXiv or PDF).
 - OpenReview `forum?id=X` → `https://openreview.net/pdf?id=X`.
+- A tool's GitHub repo or release → the page explains the tool at that version. Its
+  release notes or README, and the docs pages they link, are the main source; keep a
+  copy in the scratchpad. The PDF is the tool's own paper, which the README or docs
+  usually cite; it supplies figures and the related work. The end of step 5 says what
+  changes on the page.
 
 **Project and code links.** Papers sometimes point to stale pages, and the arXiv comment
 and the PDF can disagree. Open the candidates and keep the page that links back to this
@@ -74,8 +79,9 @@ it from the page's `paper:pdf` link.
 
 - **Short name**: the name the user calls the paper by, if they use one, such as its code
   or framework name (`RPent` for the Harness VLA paper). Otherwise the method's own
-  name, usually the word before the colon in the title (`DexAgent`). If there is none,
-  use 1–3 CamelCase words for the key idea. Letters, digits and hyphens only.
+  name, usually the word before the colon in the title (`DexAgent`); a tool release adds
+  its major version (`IsaacLab3`). If there is none, use 1–3 CamelCase words for the
+  key idea. Letters, digits and hyphens only.
 - **Name**: `<YYYY-MM-DD>-<Short>`, with today's date (the day it was retrieved, not the
   publication date). The PDF, the page and the figure folder all use this exact name.
 - **Project**: compare the abstract with each project's scope line in the profile and
@@ -102,9 +108,8 @@ The PDF is neither published nor committed: `*.pdf` is in the library's `.gitign
   past GitHub's 1 GB guideline within a few dozen papers.
 
 Each machine keeps its own copy, and the page's `paper:pdf` link fetches the same file
-again. Scratch files (notes, test
-renders) go in the session scratchpad and are deleted at the end. The library holds
-only the files above.
+again. Scratch files (notes, test renders, the paper's text) go in the session
+scratchpad, never in the library, which holds only the files above.
 
 ## 3. Read the whole paper, figures included
 
@@ -126,15 +131,18 @@ crop you may use with the Read tool. There are two reasons:
   body text, or miss a figure whose caption sits beside it. Fix it with
   `--box fig2=3:51,47,561,216` (page:x0,y0,x1,y1 in PDF points). Use a new ID such as
   `--box fig2-s1=3:120,47,230,216` to add a crop of a single panel for a stage.
-  `--page 3` writes a 72-dpi render of page 3 to read coordinates from. Each call
-  re-detects every caption and overwrites crops with the same ID, so pass all your
+  `--page 3` prints page 3's text blocks and images with their coordinates, and writes
+  a 72-dpi render, `page3.png`, to look at. A common miss: a table captioned above with
+  a figure below it on the same page, where the table crop swallows the figure. Each
+  call re-detects every caption and overwrites crops with the same ID, so pass all your
   `--box` flags in one call. It never deletes anything.
 - **Understand the figure.** The authors' figure is the most precise statement of
   their method, more precise than their prose and more precise than anything you
   redraw. Note what each region shows and which labels are printed in it. The page's
   "怎么读这张图" lists come from these notes.
 
-Before publishing, delete the crops the page does not use, and delete `figures.json`.
+Before publishing, delete the crops the page does not use, `figures.json` and any
+`pageN.png`.
 
 ## 4. Plan before writing any HTML
 
@@ -143,20 +151,32 @@ Settle these first, because the page is only as clear as this plan:
 - **The running example**: one concrete case taken from the paper itself, usually its
   teaser task or main demo, with real names and real values. It carries the whole
   page, the problem included.
-- **The problem, on that example.** Which baselines does the paper build on or compare
-  against? Group them into at most 4 families and name the methods. For each family,
-  work out:
-  - what it does with this example's input;
-  - the exact step where it breaks on this example and the visible symptom;
-  - its number on this example, or the closest one the paper reports.
-  The reader should see where things break, not a survey of related work.
-  Papers often report only outcomes (✗ or 0% per task). Then infer the breaking step
-  from the paper's own descriptions and analysis, cite the sections, and say so in the
-  note under the table. Work the paper builds on but never evaluates can take a row,
-  with "未对比" as its number. Then write the root cause in one line, and the paper's
-  way in.
+- **The problem, on that example.** Take the baselines the paper compares against or
+  builds on, at most 4 families. For each, work out what it does with this example's
+  input, the exact step where it breaks and the visible symptom, and its number on this
+  example (or the closest one the paper reports). The reader should see where things
+  break, not a survey. Papers often report only outcomes (✗ or 0% per task); then infer
+  the breaking step from the paper's own analysis, cite the section, and mark it as an
+  inference. Then write the root cause in one line, and the paper's way in.
+- **Related work**: existing efforts that solve a similar problem, or solve it with a
+  similar approach. Take them from the paper's related-work section and wherever else
+  it compares itself (intro, method, experiments, appendix); a technical report often
+  has no such section, and then those passages are the source. Search beyond the paper
+  only when the user asks for an in-depth search. Make 3–5 families with their method
+  names, closest first:
+  - the flowchart's baselines come first;
+  - merge strands that share a method;
+  - drop a family whose difference the paper neither states nor makes plain.
+  A family goes under 同一问题 if it tackles this problem, whatever its method, and under
+  相似做法 if it is this kind of method used on another problem, or on one part of this
+  one. For each family, write a phrase (about 25 characters) on each of:
+  - what it solves;
+  - how it solves it;
+  - how this paper differs: what the family lacks → what this paper does instead.
+  The reader should be able to place the paper among its neighbors at a glance, so
+  leave out history and citation lists.
 - **Stages**: 3–6 in order, each written as input → output, plus any mechanism that
-  spans every stage (a shared library, a verify-and-retry loop).
+  spans several stages (a shared library, a verify-and-retry loop).
 - **Coverage.** List every idea in the paper: each stage and module, each special
   mechanism (verification, retry on failure, learning over time, a key trick), and the
   main result. Make sure the example shows each one. If one case cannot show an idea,
@@ -168,14 +188,14 @@ Settle these first, because the page is only as clear as this plan:
 
 ## 5. Write the page
 
-If the Artifact tool requires the artifact-design skill before writing a file, load
-it now. Copy `SKILL_DIR/assets/paper-template.html` to
-`<root>/<Project>/artifact/<name>.html` and fill it. The template fixes the section order and the look, and it already meets the
-Artifact page contract, both themes and phone width. Fill it in; do not redesign it. If
-the Artifact tool asks for a quickstart or the artifact-design skill first, do that,
-then still use the template. Two things in the template look wrong but are deliberate:
-- It loads Mermaid itself, because pages other than the library home are served
-  without the artifact skeleton.
+Copy `SKILL_DIR/assets/paper-template.html` to `<root>/<Project>/artifact/<name>.html`
+and fill it. The template fixes the section order and the look, and it already meets
+the Artifact page contract, both themes and phone width. Fill it in; do not redesign
+it. If the Artifact tool asks you to load the artifact-design skill or run a quickstart
+first, do that, then still use the template: where their advice differs from it, the
+template wins. Two things in the template look wrong but are deliberate:
+- It has a doctype and loads Mermaid itself, because pages other than the library home
+  are served without the artifact skeleton.
 - It reads `class='ex'` inside quoted chart labels correctly.
 
 - **Language**: follow the profile.
@@ -183,15 +203,18 @@ then still use the template. Two things in the template look wrong but are delib
   longer text.
 - **The problem section** opens with the example in the amber box. Then a flowchart
   with one lane per baseline family, starting from the example's input and ending at the
-  `:::gap` node where it breaks, with the symptom. Then the table of at most 4 rows:
-  family, what it does, where it breaks on the example, number with its source. End
-  with the one-line root cause and the paper's way in. Big picture follows directly.
+  `:::gap` node where it breaks, with the symptom and its number. Under it go a note on
+  any breaking step you inferred, then the one-line root cause and the paper's way in.
+  The related-work table closes the section: rows grouped under 同一问题 and 相似做法,
+  columns 解决什么 / 怎么解决 / 和本文的区别. The note under the table names the sections
+  the rows come from and says whether you searched beyond them. Big picture follows
+  directly.
 - **A flowchart at every level.** Write Mermaid inside `<div class="flow"><pre>…</pre></div>`.
   Put a short name on the first line of each node and the example's value on the
   second: `S2["<b>2 · Reconstruct</b><br/><span class='ex'>screw-cap bottle</span>"]`.
   Mark nodes with `:::gap` (what fails), `:::win` (what the paper adds) or `:::example`.
   Link each Level 2 stage node with `click S2 href "#stage-2"`. A mechanism spanning
-  every stage gets an `id="stage-all"` block, linked from the hint under the chart.
+  several stages gets an `id="stage-all"` block, linked from the hint under the chart.
 - **Charts that fit.** A chart wider than its 1040 px box scrolls sideways, which breaks
   the picture:
   - put at most 4 nodes in an LR row; use TD for longer chains, or when the edges
@@ -216,6 +239,17 @@ then still use the template. Two things in the template look wrong but are delib
   - `paper:title`, `paper:source` and `paper:venue`;
   - `paper:pdf`: the versioned PDF link, which other machines use to download the PDF.
   The home page lists papers from them.
+- **A tool instead of a paper** keeps the same template:
+  - the problem's lanes are what users did before this version, or with the
+    alternatives the paper names, and the symptoms come from the release notes and docs;
+  - tag what this version adds with `<span class="win">3.0 新</span>` in the text and
+    `:::win` in the charts, so the reader can tell it from what the paper describes;
+  - figures the docs show (PNG or SVG) go into the figure folder as they are, with their
+    source in the caption;
+  - Results are what the release notes and docs report; if there are no new numbers,
+    say so and give the paper's;
+  - `paper:title` and `paper:venue` describe the release (`Isaac Lab 3.0 (v3.0.0)`,
+    `GitHub release 2026-10-20`); the paper goes in the header's links.
 
 ## 6. Check, rebuild the home page, publish
 
@@ -232,29 +266,27 @@ python3 SKILL_DIR/scripts/build_index.py <root>
 Fix every FAIL and every too-wide chart, then rerun it. `build_index.py` rewrites
 `<root>/index.html` and prints every publishable file path.
 
-The whole library is **one** artifact, named by the profile's "Artifact title" (its home
-page `<title>`, which `build_index.py` sets). Agents on other machines publish into the
-same one, so always look for it before creating anything:
+The whole library is **one** artifact, titled by the profile's "Artifact title" (Zhaoning
+Paper Pile; `build_index.py` puts it in the home page's `<title>`). Agents on every
+machine publish into the same one, so find it by its title on every run:
 
-1. Take the profile's Artifact URL, and `read` it.
-2. If there is no URL, or it does not read, `list` your artifacts (`limit: 200`) and
-   take the one whose title is exactly the artifact title. Write its URL into the
-   profile.
-3. Only if neither finds it, create it: publish with `file_path: <root>/index.html`,
+1. `list` your artifacts (`limit: 200`) and take the one whose title is exactly the
+   artifact title. Only your own count: one shared from another account cannot take a
+   publish, so it counts as not found.
+2. **Found:** `read` it, then `list` its files (`scope: "files"`); the tool refuses to
+   update an artifact this session has not read. Publish into it, which adds the paper
+   as a new page: `url`, `file_path: <root>/index.html`, `root: <root>` and `files:` set
+   to the new or changed page and its figure files. Files you leave out stay as they
+   are. When a redo removes a figure, use the map form of `files`
+   (`{"<path>": "<path>", "<old path>": null}`), because only the map form can pass
+   `null`.
+3. **Not found:** create it with the whole library: `file_path: <root>/index.html`,
    `root: <root>`, `files:` every path the script printed (as `{"path": …}` items),
-   `icon: "book"` and a one-sentence description. Write the returned URL into the
-   profile.
+   `icon: "book"` and a one-sentence description.
 
-To publish into the artifact you found:
-- **Found:** after the `read`, `list` it with `scope: "files"`. The tool refuses to update
-  an artifact this session has not read. Then publish with `url`,
-  `file_path: <root>/index.html`, `root: <root>` and `files:` set to the new or changed
-  page and its figure files. Files you leave out stay as they are. When a redo removes
-  a figure, use the map form of `files` (`{"<path>": "<path>", "<old path>": null}`),
-  because only the map form can pass `null`.
-- Artifact sources must sit under the session's working directory or scratchpad. If the
-  library does not, copy `index.html` and the new files into the scratchpad with the
-  same relative paths, and use that copy as `root`.
+Artifact sources must sit under the session's working directory or scratchpad. If the
+library does not, copy `index.html` and the new files into the scratchpad with the same
+relative paths, and use that copy as `root`.
 
 After publishing, `list` the files once to confirm that the page and its figures are
 there.
@@ -289,7 +321,7 @@ this session holds the paper before you report:
 - Otherwise load it now. That applies when the work ran in a subagent, when the context
   was compacted, or when this is a later session. If the PDF is not on this machine,
   download it from the page's `paper:pdf` link first. Then load the finished page's
-  text and the paper's own text:
+  text and the paper's own text (for a tool, also its release notes):
 
   ```bash
   sed -e '/<style>/,/<\/style>/d' -e '/<script/,/<\/script>/d' <page> | sed 's/<[^>]*>//g' | grep -v '^\s*$' > <scratchpad>/<name>.page.txt
