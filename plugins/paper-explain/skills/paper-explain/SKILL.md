@@ -215,13 +215,19 @@ template wins. Two things in the template look wrong but are deliberate:
   Mark nodes with `:::gap` (what fails), `:::win` (what the paper adds) or `:::example`.
   Link each Level 2 stage node with `click S2 href "#stage-2"`. A mechanism spanning
   several stages gets an `id="stage-all"` block, linked from the hint under the chart.
-- **Charts that fit.** A chart wider than its 1040 px box scrolls sideways, which breaks
-  the picture:
-  - put at most 4 nodes in an LR row; use TD for longer chains, or when the edges
-    carry labels, because labels widen the gaps;
+- **Charts that fit.** Charts are read in the artifact's side panel, about 760 px wide.
+  The page shrinks a chart to fit, down to 70 % of its natural width, and scrolls it
+  beyond that, which hides the right-hand nodes. `check_page.py` fails a chart that still
+  scrolls at 760 px and warns above 760 px natural width, so aim for 760 px or less:
+  - put at most 3 nodes in an LR row; use TD for longer chains, or when the edges
+    carry labels, because labels widen the gaps; a two-lane chart has at most 2 columns;
   - keep a node to a short name plus one example line of about 18 Latin or 10 Chinese
     characters, splitting longer values with `<br/>`;
   - use plain boxes: diamond `{}` nodes balloon in size;
+  - keep a `subgraph` title under 200 px (about 24 Latin or 12 Chinese characters):
+    Mermaid wraps a longer title onto a second line that the first node then covers.
+    Prefer a header node per lane. The check fails any wrapped or covered subgraph
+    title, any label larger than its box, and any label outside the drawing;
   - inside a label write `#quot;` for a raw `"`, and `&lt;`/`&amp;` for `<`/`&` meant as
     text.
 - **The authors' figures carry the explanation.** Show each one with
@@ -260,8 +266,9 @@ python3 SKILL_DIR/scripts/build_index.py <root>
 
 `check_page.py` checks two things:
 - **Statically**: placeholders, meta tags, figure files and stage links.
-- **In headless Chromium**: every flowchart draws, fits its box, raises no errors, and
-  the page does not scroll sideways at phone width.
+- **In headless Chromium**: every flowchart draws, no chart text is clipped, every chart
+  fits a 760 px panel after shrinking, no errors, and the page does not scroll sideways
+  at phone width.
 
 Fix every FAIL and every too-wide chart, then rerun it. `build_index.py` rewrites
 `<root>/index.html` and prints every publishable file path.
