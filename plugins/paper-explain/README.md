@@ -11,7 +11,9 @@ and say "help me understand this". The skill:
 3. **Reads the whole paper and crops the authors' figures** straight from the PDF
    (`extract_figures.py`). Then it looks at every crop, both to check the crop and to
    understand the figure, because the authors' figure is the most precise description
-   of the method.
+   of the method. If the paper has a project page, it also lists that page's figures,
+   videos and viewers (`page_media.py`) and keeps the ones that show a point better or
+   in motion.
 4. **Writes the explainer page** next to the PDF, as `<Project>/artifact/<name>.html`,
    in the reader's style from `preferences.md`:
    - the problem told on one running example: what each baseline does and exactly

@@ -125,6 +125,11 @@ table.related tr.group th { font: 700 .85rem var(--f-display); letter-spacing: .
 .paper-fig img { display: block; width: auto; max-width: 100%; max-height: 80vh; margin: 0 auto; cursor: zoom-in; filter: brightness(var(--fig-dim)); }
 .paper-fig figcaption { font-size: .88rem; color: var(--muted); margin-top: .5rem; max-width: 80ch; }
 .paper-fig figcaption b { font-family: var(--f-mono); font-weight: 500; color: var(--ink); }
+/* project-page media: videos, and two or three of them side by side to compare */
+.paper-fig video { display: block; width: 100%; max-height: 70vh; margin: 0 auto; border-radius: 4px; background: #000; }
+.media-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .6rem; }
+.media-row figure { margin: 0; }
+.media-row figcaption { font: 500 .8rem var(--f-mono); color: #3a4250; margin-top: .3rem; }
 ol.read { padding-left: 1.4rem; margin: .5rem 0 0; }
 ol.read li + li { margin-top: .3rem; }
 ol.read li::marker { font: 500 .85em var(--f-mono); color: var(--accent); }
@@ -168,8 +173,16 @@ details.stage[open] > summary::after { content: "\2212"; }
 details.recap { margin-top: 1.25rem; }
 details.recap > summary { cursor: pointer; font-size: .92rem; color: var(--muted); }
 
-/* results */
-.results li b:first-child { font-family: var(--f-mono); color: var(--win); }
+/* results: one block per experiment, the authors' table first */
+.exp { margin-top: 1.75rem; }
+.exp + .exp { padding-top: 1.75rem; border-top: 1px dashed var(--rule); }
+.exp-n { font: 500 .85rem var(--f-mono); color: var(--accent); margin-right: .5rem; }
+.exp-src { font: 400 .8rem var(--f-mono); color: var(--muted); margin-left: .5rem; }
+dl.exp-notes { margin: 0; display: grid; }
+dl.exp-notes > div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 1rem; align-items: baseline; padding-block: .55rem; border-bottom: 1px dashed var(--rule); }
+dl.exp-notes dt { font: 500 .8rem var(--f-mono); color: var(--muted); }
+dl.exp-notes dd { margin: 0; }
+dl.exp-notes ul.tight { margin: 0; }
 
 footer { border-top: 1px solid var(--rule); padding-block: 1.5rem 3rem; font-size: .85rem; color: var(--muted); }
 
@@ -177,7 +190,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 1.5rem 3rem; font-siz
 .lightbox img { max-height: 100%; background: var(--paper); padding: .5rem; border-radius: 6px; }
 
 @media (max-width: 560px) {
-  .tldr dl > div { grid-template-columns: minmax(0, 1fr); gap: .1rem; }
+  .tldr dl > div, dl.exp-notes > div { grid-template-columns: minmax(0, 1fr); gap: .1rem; }
   .crumb .proj { display: none; }
 }
 </style>
@@ -263,6 +276,15 @@ flowchart LR
   <ol class="read">
     <li><b>{{图里的位置和标签}}：</b>{{它表示什么，对应例子里的什么}}</li>
   </ol>
+  <!-- Optional, anywhere a project-page figure or video shows the point better or in motion:
+  <figure class="paper-fig">
+    <div class="mat media-row">
+      <figure><video src="{{name}}/web-a.mp4" autoplay muted loop playsinline controls></video><figcaption>{{真机}}</figcaption></figure>
+      <figure><video src="{{name}}/web-b.mp4" autoplay muted loop playsinline controls></video><figcaption>{{本文}}</figcaption></figure>
+    </div>
+    <figcaption><b>项目页</b> <a href="{{project page}}#{{section}}">{{section}}</a>：{{看什么、比什么}}</figcaption>
+  </figure>
+  -->
   <!-- Input -> one or two boxes -> output in one LR row (3 nodes per row at most), or TD; each box
        carries the example's value on a second line. Natural width 760 px at most. -->
   <div class="flow"><pre>
@@ -330,11 +352,24 @@ flowchart LR
 
 <section id="results">
   <p class="eyebrow">Results</p>
-  <h2>结果一览</h2>
-  <ul class="tight results">
-    <li><b>{{数字}}</b> {{和谁比、说明了什么}}</li>
-  </ul>
-  <!-- The authors' main table or plot, cropped, with one line on which row or column to read first. -->
+  <h2>{{实验合起来证明了什么，一句话}}</h2>
+  <p>{{顺序同论文：<a href="#exp-1">E1</a> 回答什么 → <a href="#exp-2">E2</a> …；比的是成功率、速度还是别的}}</p>
+  <!-- One .exp block per experiment, in the order of the paper's argument. The authors' table
+       or plot comes first; an experiment reported only in the text gets a small table built
+       from those numbers, with a note saying so. No list of headline numbers. -->
+  <div class="exp" id="exp-1">
+    <h3><span class="exp-n">E1</span>{{这个实验回答的问题}}<span class="exp-src">{{§N}}</span></h3>
+    <figure class="paper-fig">
+      <div class="mat"><img src="{{name}}/tabN.jpg" alt="{{alt}}"></div>
+      <figcaption><b>Table N</b>（作者原图）{{先看哪一行、哪一列}}</figcaption>
+    </figure>
+    <dl class="exp-notes">
+      <div><dt>说明什么</dt><dd><b>{{成功率更高 / 时间更短 / 更稳。}}</b>{{关键数字，和谁比}}</dd></div>
+      <div><dt>在故事里</dt><dd>{{它撑起论文论证的哪一环}}</dd></div>
+      <div><dt>指标</dt><dd>{{怎样算成功（照论文的定义）；几个 seed 或几次}}</dd></div>
+      <div><dt>怎么评测</dt><dd><ul class="tight"><li>{{环境、物体或任务、次数}}</li><li>{{baseline 是谁、怎么跑的；对哪边更有利}}</li></ul></dd></div>
+    </dl>
+  </div>
 </section>
 
 <section id="limits">

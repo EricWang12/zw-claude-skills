@@ -5,8 +5,8 @@
 # ///
 """Check a paper page before publishing it.
 
-Static checks: no double-brace placeholders left, meta tags filled, every <img> file
-exists, no unused files in the figure folder, Level 2 click targets match the Level 3
+Static checks: no double-brace placeholders left, meta tags filled, every <img> and
+<video> file exists, no unused files in the figure folder, Level 2 click targets match the Level 3
 stage ids.
 Rendered checks (headless Chromium, every <details> opened) at 1200 px (desktop), 760 px
 (the artifact's side panel, where charts are read) and 390 px (phone): each flowchart
@@ -91,9 +91,9 @@ def static_checks(page):
     for name in ("description", "paper:title", "paper:source", "paper:venue", "paper:pdf"):
         m = re.search(rf'<meta name="{name}" content="([^"]*)"', src)
         out.append(("PASS" if m and m.group(1).strip() else "FAIL", f"meta {name} filled"))
-    imgs = re.findall(r'<img src="([^"]+)"', src)
+    imgs = re.findall(r'<(?:img|video) src="([^"]+)"', src)
     missing = [i for i in imgs if not (page.parent / i).is_file()]
-    out.append(("FAIL" if missing or not imgs else "PASS", f"{len(imgs)} authors' figures embedded"
+    out.append(("FAIL" if missing or not imgs else "PASS", f"{len(imgs)} figures and videos embedded"
                 + (f"; missing files: {missing}" if missing else "")))
     figdir = page.parent / page.stem
     unused = [f.name for f in figdir.glob("*") if f"{page.stem}/{f.name}" not in imgs] if figdir.is_dir() else []

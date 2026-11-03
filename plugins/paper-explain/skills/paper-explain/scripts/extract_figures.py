@@ -5,7 +5,8 @@
 # ///
 """Crop the authors' figures and tables out of a paper PDF.
 
-Every text block that starts with a caption ("Fig. 3:", "Figure 3.", "TABLE II:")
+Every text block that starts with a caption ("Fig. 3:", "Figure 3.", "TABLE II:",
+or "Figure 3 Overview" with no punctuation, as some templates print it)
 marks one crop. The search area runs from the caption to the nearest body
 paragraph, other caption or page margin (upwards for figures, downwards for
 tables). Inside it, the crop is the union of the drawn graphics and embedded
@@ -31,7 +32,7 @@ from pathlib import Path
 
 import pymupdf
 
-CAPTION = re.compile(r"^(fig(?:ure)?\.?|table)\s*(S?\d+|[IVXL]+)\s*[:.|]", re.I)
+CAPTION = re.compile(r"^(fig(?:ure)?\.?|table)\s*(S?\d+|[IVXL]+)\s*(?:[:.|]|\s(?=(?-i:[A-Z])))", re.I)
 ROMAN = {"I": 1, "V": 5, "X": 10, "L": 50}
 MIN_PX, MAX_PX = 900, 1800  # crop width range in pixels; narrow panels get a higher dpi
 

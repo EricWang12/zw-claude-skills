@@ -141,6 +141,50 @@ crop you may use with the Read tool. There are two reasons:
   redraw. Note what each region shows and which labels are printed in it. The page's
   "怎么读这张图" lists come from these notes.
 
+### The project page's figures, videos and viewers
+
+A project page often shows the method better than the PDF can: a sharper or cleaner
+version of a figure, an animation of a stage, result videos side by side, an interactive
+viewer. Whenever the paper has a project page, list what it shows:
+
+```bash
+uv run SKILL_DIR/scripts/page_media.py <project page URL> <scratchpad>/project-page/
+```
+
+It opens the page in headless Chromium and scrolls it, so media loaded by JavaScript
+count too. It prints one line per image, video, GIF, canvas or iframe, with its size, URL
+and the section heading above it, and writes a full-page screenshot, `project-page.png`.
+Look at the screenshot in pieces with the Read tool to see what each item is and what the
+page's own captions say. Items a viewer loads only on click (a carousel's later steps)
+are missing from the list; their URLs usually follow the listed ones' pattern, so try
+them with `curl -sI`.
+
+Then, for each item, decide where it helps the reader, and take it only if it does:
+- **A better version of a paper figure** (same content, higher resolution or clearer):
+  use it in place of the PDF crop.
+- **Related media the PDF cannot show** (an animation of a stage, a simulation rollout,
+  real-vs-sim videos, a before-and-after pair): put it in the level, stage or experiment
+  it illustrates, next to the authors' figure, not instead of it.
+- **An interactive viewer** (3D, slider, tool-call trace): it cannot be embedded. Take
+  its still frames or videos if the page serves them, and link to the section.
+- **Skip** decoration, logos, near-duplicates and long galleries: one or two cases per
+  point, preferably the running example.
+
+Example (SceneRig, 2026-11-03): the PDF's Fig. 5 is an animation that plays only in
+Acrobat, so the project page's real/ours/baseline videos replace it in Results; the
+page's correlation plot is Fig. 4 at higher resolution and replaces the crop; its gallery
+shows every baseline on the running example's scene, which made the problem section
+concrete; and its recorded tool-call trace (five steps, with IoU values) became the
+running example of the refinement stage.
+
+Download what you keep into the figure folder with a `web-` prefix
+(`web-gravity-ours.mp4`, `web-settlement.webp`) and open each image with the Read tool.
+Keep the page light, since everything is published and committed:
+- every video under about 3 MB: re-encode a larger one with
+  `ffmpeg -i in.mp4 -an -vf "scale='min(960,iw)':-2" -c:v libx264 -crf 28 -movflags +faststart out.mp4`;
+- the whole folder under about 15 MB;
+- no audio, and only MP4, WebM, WebP, PNG, JPG, GIF or SVG.
+
 Before publishing, delete the crops the page does not use, `figures.json` and any
 `pageN.png`.
 
@@ -184,7 +228,15 @@ Settle these first, because the page is only as clear as this plan:
   example. This list becomes the Recap table. Any idea the example skips stays abstract
   for the reader.
 - **Figure map**: which author figure explains which level or stage, and which table or
-  plot is the evidence.
+  plot is the evidence. Add the project-page media you kept: which point each one
+  shows, and whether it replaces a PDF crop or sits beside it.
+- **Experiments**: list them in the order of the paper's argument (usually its §4
+  questions; an appendix experiment gets its own entry only when the main text leans on
+  it, otherwise it goes into the entry it supports). For each: the question it answers,
+  its table or plot, what it shows and against what (higher success, less time, more
+  robust), the metric with the paper's own definition of success, and how it was run:
+  where, which objects or tasks, trials or seeds, how each baseline was run, and anything
+  that favours one side. Note what the paper leaves unsaid.
 
 ## 5. Write the page
 
@@ -236,6 +288,23 @@ template wins. Two things in the template look wrong but are deliberate:
   labels printed in it, and ties each region to the running example. When the authors
   drew something, show their figure first. Your flowchart then adds the example's values
   and the level structure.
+- **Project-page media** go in the same `.paper-fig` blocks, captioned "项目页" with a
+  link to the page's section, and get a one- or two-line reading guide too (what moves,
+  what to compare). Show a video with `<video src="<name>/web-x.mp4" autoplay muted loop
+  playsinline controls>`. Put two or three videos to compare in one `.media-row`, each
+  in a `<figure>` with a short label (真机 / SceneRig / baseline). Numbers still come from
+  the paper. If the project page reports different numbers (another model, more scenes),
+  give the paper's and note the difference.
+- **Results, one experiment at a time.** Each planned experiment becomes an `.exp`
+  block: the question as its heading, then the authors' table or plot (an experiment
+  reported only in the text gets a small table built from those numbers, labelled as
+  such), then four lines: 说明什么 (the claim in bold, such as higher success, less time
+  or more robust, then the key numbers and what they beat), 在故事里 (which step of the
+  paper's argument it carries), 指标 (what counts as success, as the paper defines it)
+  and 怎么评测 (setup and baselines, as bullets). A one-line intro links the blocks in
+  order and says whether the paper compares success, time or both. Never open with a
+  list of headline numbers: a number means nothing without its table, its metric and
+  what it is compared against.
 - **Exact numbers.** Copy numbers as printed and name their table or figure. If the
   paper does not report something, say so rather than estimating. Mark your own
   inferences as inferences.
@@ -265,7 +334,7 @@ python3 SKILL_DIR/scripts/build_index.py <root>
 ```
 
 `check_page.py` checks two things:
-- **Statically**: placeholders, meta tags, figure files and stage links.
+- **Statically**: placeholders, meta tags, figure and video files, and stage links.
 - **In headless Chromium**: every flowchart draws, no chart text is clipped, every chart
   fits a 760 px panel after shrinking, no errors, and the page does not scroll sideways
   at phone width.
