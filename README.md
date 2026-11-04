@@ -7,7 +7,7 @@ and rules from `plugins/`.
 | Plugin | What it does |
 | --- | --- |
 | [**vscode-debug**](plugins/vscode-debug/README.md) | Places **real breakpoints** in the VS Code / Cursor gutter from a terminal — no injected `breakpoint()` calls — and turns a command that already works into a steppable walkthrough of the code |
-| [**kiss-rules**](plugins/kiss-rules/README.md) | Injects three standing rules into every session: keep code simple, never commit unless asked, and no authorship trailers in commit messages |
+| [**kiss-rules**](plugins/kiss-rules/README.md) | Injects four standing rules into every session: keep code simple, never commit unless asked, no authorship trailers in commit messages, and artifacts visual rather than verbose |
 | [**user-sleep**](plugins/user-sleep/README.md) | Tell the agent you're going to sleep: from then on it never asks questions or waits for input — it decides with best judgment, keeps working, and leaves a "while you were asleep" decision log |
 | [**reproduce**](plugins/reproduce/README.md) | Paste a GitHub repo or project page: it clones, builds a short-named env, picks the biggest model that fits the *free* GPU memory, runs ≥3 verified demos, and publishes a flow artifact where the real examples ride through the flowchart |
 | [**paper-explain**](plugins/paper-explain/README.md) | Paste a paper link: it files the PDF into your project library, crops the authors' figures, and writes a visual explainer — the problem shown on one running example, then big picture → stages → details — published as a page of one shared artifact, with the library synced to its GitHub repo |

@@ -1,11 +1,13 @@
 # kiss-rules
 
-Three standing rules, injected into the top of every session:
+Four standing rules, injected into the top of every session:
 
 1. **Keep it simple and stupid** — the straightforward solution, no speculative abstraction.
 2. **Never commit unless asked** — no `git commit` on the agent's own initiative.
 3. **No authorship in commit messages** — concise summary only, no `Co-Authored-By`, no
    "Generated with" footer.
+4. **Artifacts visual, not verbose** — show it with figures, diagrams and tables; keep only
+   the words that have to be words.
 
 The rules live in [`rules/RULES.md`](rules/RULES.md). Edit that one file to change them;
 nothing else needs touching.

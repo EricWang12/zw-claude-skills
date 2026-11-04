@@ -12,7 +12,7 @@
     {
       "name": "kiss-rules",
       "source": "./plugins/kiss-rules",
-      "description": "KISS rules, injected into every session: keep code simple and stupid, never commit unless asked, and no authorship trailers in commit messages."
+      "description": "KISS rules, injected into every session: keep code simple and stupid, never commit unless asked, no authorship trailers in commit messages, and artifacts visual, not verbose."
     },
     {
       "name": "user-sleep",

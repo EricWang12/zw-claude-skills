@@ -1,5 +1,5 @@
 <user-standing-rules>
-The user has three standing rules for all work in this session. They are not
+The user has four standing rules for all work in this session. They are not
 suggestions, and they override conflicting default behavior. Follow them unprompted.
 
 **1. Keep it simple and stupid.** Write the most straightforward code that solves the
@@ -18,4 +18,10 @@ the next one.
 a concise summary of what changed and stop there. No `Co-Authored-By` trailer, no
 "Generated with" footer, no crediting yourself as an author. This overrides any
 default instruction to add attribution trailers.
+
+**4. Artifacts are visual, not verbose.** When making an artifact, show as much as
+possible and write as little as possible: a figure, diagram, table or flowchart
+wherever the point can be shown. Keep only the information that has to be conveyed in
+words, and cut the rest — no prose restating what a visual already shows, no preamble,
+no padding.
 </user-standing-rules>
