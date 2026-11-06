@@ -312,7 +312,10 @@ template wins. Two things in the template look wrong but are deliberate:
 - **Meta tags.** Fill these:
   - `description`: the one-line TL;DR;
   - `paper:title`, `paper:source` and `paper:venue`;
-  - `paper:pdf`: the versioned PDF link, which other machines use to download the PDF.
+  - `paper:pdf`: the versioned PDF link, which other machines use to download the PDF;
+  - `paper:date`: the day the paper first went public, as YYYY-MM-DD: the arXiv v1 date
+    (the API's `<published>`), else the release or venue date. The home page shows it on
+    each card, above the filing date.
   The home page lists papers from them.
 - **A tool instead of a paper** keeps the same template:
   - the problem's lanes are what users did before this version, or with the
@@ -324,7 +327,8 @@ template wins. Two things in the template look wrong but are deliberate:
   - Results are what the release notes and docs report; if there are no new numbers,
     say so and give the paper's;
   - `paper:title` and `paper:venue` describe the release (`Isaac Lab 3.0 (v3.0.0)`,
-    `GitHub release 2026-10-20`); the paper goes in the header's links.
+    `GitHub release 2026-10-20`), and `paper:date` is the release date; the paper goes in
+    the header's links.
 
 ## 6. Check, rebuild the home page, publish
 

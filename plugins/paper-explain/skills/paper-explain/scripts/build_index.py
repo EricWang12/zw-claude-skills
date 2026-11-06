@@ -45,6 +45,8 @@ ol.papers a { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 
   background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; color: inherit; text-decoration: none; }
 ol.papers a:hover { border-color: var(--accent); }
 .date { font: 500 .82rem/1.9 var(--f-mono); color: var(--muted); grid-row: span 3; }
+.date b { font-weight: 500; color: var(--ink); }
+.date small { display: block; font-size: .72rem; line-height: 1.3; }
 .name { font-family: var(--f-display); font-weight: 700; font-size: 1.15rem; color: var(--accent); }
 .title { font-size: .95rem; }
 .tldr { font-size: .9rem; color: var(--muted); }
@@ -73,8 +75,10 @@ def paper_item(root, page):
     date, short = page.stem[:10], page.stem[11:]  # "2026-10-15-DexAgent"
     e = html.escape
     venue = meta(src, "paper:venue")
+    published = meta(src, "paper:date")  # first public date (arXiv v1); the filing date goes below it
+    when = f'<b>{e(published)}</b><small>归档 {e(date)}</small>' if published else e(date)
     return (f'<li><a href="{e(page.relative_to(root).as_posix())}">'
-            f'<span class="date">{e(date)}</span>'
+            f'<span class="date">{when}</span>'
             f'<span class="name">{e(html.unescape(m.group(1).strip()) if m else short)}</span>'
             f'<span class="title">{e(meta(src, "paper:title"))}{" · " + e(venue) if venue else ""}</span>'
             f'<span class="tldr">{e(meta(src, "description"))}</span></a></li>')
@@ -104,7 +108,7 @@ def main():
   <h1>{title}</h1>
   <p class="sub">每篇 paper 先对着一个 <span class="ex">running example</span> 讲清 problem，
   再 big picture → stages → details，并逐块解读作者原图。下面的文件夹和磁盘上的
-  <code>{root.name}/</code> 一一对应。</p>
+  <code>{root.name}/</code> 一一对应。每张卡左边是论文首次公开的日期（arXiv v1 或 release），小字是归档日期。</p>
 </header>
 <main class="frame">
 {chr(10).join(sections)}

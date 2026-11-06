@@ -91,6 +91,8 @@ def static_checks(page):
     for name in ("description", "paper:title", "paper:source", "paper:venue", "paper:pdf"):
         m = re.search(rf'<meta name="{name}" content="([^"]*)"', src)
         out.append(("PASS" if m and m.group(1).strip() else "FAIL", f"meta {name} filled"))
+    m = re.search(r'<meta name="paper:date" content="(\d{4}-\d{2}-\d{2})"', src)
+    out.append(("PASS" if m else "WARN", "meta paper:date filled (YYYY-MM-DD, first public date)"))
     imgs = re.findall(r'<(?:img|video) src="([^"]+)"', src)
     missing = [i for i in imgs if not (page.parent / i).is_file()]
     out.append(("FAIL" if missing or not imgs else "PASS", f"{len(imgs)} figures and videos embedded"
