@@ -1,0 +1,14 @@
+{
+  "name": "transcribe-meeting",
+  "description": "Point it at a local meeting recording: it transcribes on your GPU with WhisperX large-v3 in the original language (code-switching kept), reviews loops and missed quiet speech, and writes a summary where every point opens its source passage and plays that clip at its original HH:MM:SS. All local.",
+  "version": "0.1.0",
+  "author": {
+    "name": "EricWang12"
+  },
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Transcribe Meeting",
+    "shortDescription": "Local transcripts + linked summaries"
+  }
+}
