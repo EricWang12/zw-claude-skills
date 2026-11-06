@@ -31,6 +31,14 @@ and say "help me understand this". The skill:
 7. **Commits and pushes** the library, then loads the paper into the session so it can
    answer your follow-up questions.
 
+**Stars.** On the library pages, star a paper (the star on its card, or 星标 in its top
+bar) or a whole folder (整个文件夹, by the folder's name). The 星标 switch under the title
+shows only the starred papers. Ask for "my starred papers" and the skill reads the stars
+itself, from every copy of the library your account can open.
+
+**Temporary papers.** Add "temp" (or "temporary", 临时) and the page gets an artifact of
+its own. Nothing is filed in the library or pushed.
+
 Some feedback is about how you like papers explained in general, such as "fewer bullets"
 or "explain the problem on the example". That kind goes into `preferences.md` and is
 pushed, so every later paper follows it on every machine.
@@ -69,6 +77,10 @@ Both hosts load the same `skills/paper-explain/SKILL.md`.
 > what changed in this release? https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0
 
 > TL;DR this one for the real-to-sim project https://openreview.net/forum?id=...
+
+> explain this, temp: https://arxiv.org/abs/2609.35318
+
+> write the related work from my starred papers
 
 ## What you get back
 

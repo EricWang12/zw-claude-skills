@@ -1,7 +1,7 @@
 {
   "name": "paper-explain",
   "description": "Paste a paper link: it files the PDF into your project library, crops the authors' figures, and writes a visual explainer (the problem shown on one running example, then big picture, stages and details), published as a page of one shared artifact and synced to the library's GitHub repo.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "author": {
     "name": "EricWang12"
   },

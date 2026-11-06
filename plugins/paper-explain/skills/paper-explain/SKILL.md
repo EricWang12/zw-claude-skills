@@ -1,6 +1,6 @@
 ---
 name: paper-explain
-description: Explain a research paper or tool the way this user learns best, and file it in their paper library. Given a paper link (arXiv abs/pdf, project page, OpenReview, any PDF URL) or a tool's GitHub repo or release, it downloads the PDF into the right project folder under a dated short name (2026-10-15-DexAgent), reads the whole paper, crops and inspects the authors' figures, and writes a visual page - the problem told on one running example (where each baseline breaks), a concise related-work table (what each neighbor solves, how, and how this paper differs), then big picture → stages → per-stage detail with flowcharts, the original figures explained part by part. The page is saved next to the PDF, added as a new page of the user's single library artifact (Zhaoning Paper Pile, found by its title in the artifact list and created if missing), and the library is pulled from and pushed to its GitHub repo so every machine stays in sync. Use this whenever the user shares a paper, project-page or tool-release link, or asks to read, explain, summarize, break down, TL;DR or "help me understand" a paper or tool, or to add one to the library - even if they never say "explain".
+description: Explain a research paper or tool the way this user learns best, and file it in their paper library. Given a paper link (arXiv abs/pdf, project page, OpenReview, any PDF URL) or a tool's GitHub repo or release, it downloads the PDF into the right project folder under a dated short name (2026-10-15-DexAgent), reads the whole paper, crops and inspects the authors' figures, and writes a visual page - the problem told on one running example (where each baseline breaks), a concise related-work table (what each neighbor solves, how, and how this paper differs), then big picture → stages → per-stage detail with flowcharts, the original figures explained part by part. The page is saved next to the PDF, added as a new page of the user's single library artifact (Zhaoning Paper Pile, found by its title in the artifact list and created if missing), and the library is pulled from and pushed to its GitHub repo so every machine stays in sync. Use this whenever the user shares a paper, project-page or tool-release link, or asks to read, explain, summarize, break down, TL;DR or "help me understand" a paper or tool, or to add one to the library - even if they never say "explain". A paper called temporary ("temporary", "temp", 临时) gets its own artifact and is never filed or pushed. Also use it to work from the user's starred papers (星标), such as writing related work from them.
 ---
 
 # Paper explain
@@ -14,6 +14,9 @@ run:
    mirrors the folder tree.
 4. The library committed and pushed to its GitHub repo, so agents on every machine work
    in the same library.
+
+A paper the user calls temporary gets only the page, in an artifact of its own; see
+"Temporary papers" below. "Starred papers" says how to gather the papers the user starred.
 
 `SKILL_DIR` below is the directory containing this file.
 
@@ -344,7 +347,8 @@ python3 SKILL_DIR/scripts/build_index.py <root>
   at phone width.
 
 Fix every FAIL and every too-wide chart, then rerun it. `build_index.py` rewrites
-`<root>/index.html` and prints every publishable file path.
+`<root>/index.html`, copies `library.js` (the stars and the folder drop lists) beside
+it, and prints every publishable file path.
 
 The whole library is **one** artifact, titled by the profile's "Artifact title" (Zhaoning
 Paper Pile; `build_index.py` puts it in the home page's `<title>`). Agents on every
@@ -355,18 +359,21 @@ machine publish into the same one, so find it by its title on every run:
    publish, so it counts as not found.
 2. **Found:** `read` it, then `list` its files (`scope: "files"`); the tool refuses to
    update an artifact this session has not read. Publish into it, which adds the paper
-   as a new page: `url`, `file_path: <root>/index.html`, `root: <root>` and `files:` set
-   to the new or changed page and its figure files. Files you leave out stay as they
+   as a new page: `url`, `file_path: <root>/index.html`, `root: <root>`,
+   `capabilities: {"db": {}}` (the database that keeps the stars) and `files:` set to
+   `library.js` and the new or changed page and its figure files. If the listing has no
+   `library.js` yet, also add every page (`.html`) that is both in the listing and in
+   the printed paths, so the older pages get their star. Files you leave out stay as they
    are. When a redo removes a figure, use the map form of `files`
    (`{"<path>": "<path>", "<old path>": null}`), because only the map form can pass
    `null`.
 3. **Not found:** create it with the whole library: `file_path: <root>/index.html`,
    `root: <root>`, `files:` every path the script printed (as `{"path": …}` items),
-   `icon: "book"` and a one-sentence description.
+   `capabilities: {"db": {}}`, `icon: "book"` and a one-sentence description.
 
 Artifact sources must sit under the session's working directory or scratchpad. If the
-library does not, copy `index.html` and the new files into the scratchpad with the same
-relative paths, and use that copy as `root`.
+library does not, copy `index.html`, `library.js` and the new files into the scratchpad
+with the same relative paths, and use that copy as `root`.
 
 After publishing, `list` the files once to confirm that the page and its figures are
 there.
@@ -451,6 +458,54 @@ push that repo right after the change, with a one-line message and no attributio
 trailers, so every machine gets the new version. The user has authorized these commits.
 If `SKILL_DIR` is not inside a git clone of that repo, for example in a plugin cache,
 tell the user that the change still needs to go into the plugin repo.
+
+## Temporary papers
+
+When the user calls a paper temporary ("temporary", "temp" or 临时), explain it in full but
+keep it out of the library: it gets its own artifact, and nothing is filed or pushed.
+
+- Steps 0 and 1 run as usual. The profile still sets the voice, and a paper already in
+  the library gets a pointer to its page instead.
+- Wherever the steps say `<root>/<Project>`, use `<scratchpad>/temp`: the PDF, the page
+  in `artifact/` and its crops beside the page. Still pick the closest project, because
+  "For you" and the filed line need it.
+- The page has no library to point to. In the copy of the template, change:
+  - the crumb to `<span class="crumb">Temporary</span>`;
+  - the eyebrow to `临时 · <today>`;
+  - the filed line to `临时，不进 library。最接近 <b>{{Project}}</b>：{{一句话理由}}`;
+  - the footer to `临时页面，不在 library 里。`;
+  - and delete the `library.js` script line, because stars live in the library.
+- Step 6: run `check_page.py`, skip `build_index.py`, and publish a new artifact:
+  `file_path: <scratchpad>/temp/artifact/<name>.html`, `root: <scratchpad>/temp/artifact`,
+  `files:` its crops (`<name>/…`), `icon: "book"` and a description that starts with
+  "Temporary:". The tool nests the page, doctype and all, inside its own skeleton, which
+  renders fine. A fix republishes to the same artifact.
+- Skip step 7. Steps 8 and 9 run as usual; the report says the paper is temporary and
+  that its files go when the scratchpad is cleared. Feedback on how the user likes papers
+  explained still goes into the profile, committed and pushed as usual.
+- If the user then wants to keep it, file it: move the PDF, the page and its crops into
+  the project folder, restore those five places from the template, and run steps 6
+  and 7.
+
+## Starred papers
+
+On the library pages the user stars papers, or whole project folders, to mark the ones
+they will work from, such as the papers for a related-work section or a paper to review
+carefully. When they ask for their starred papers (星标), gather them yourself:
+
+1. `list` artifacts with `scope: "all"` and `limit: 200`, and keep every one titled
+   exactly the artifact title. Each account has its own copy with its own stars, so use
+   them all.
+2. For each copy, `list` the collection `stars` with the ArtifactData tool, and take the
+   union of the doc ids. `<Project>:<name>` is one paper, the page
+   `<root>/<Project>/artifact/<name>.html`. A bare `<Project>` is the whole folder: every
+   page in `<root>/<Project>/artifact/` now, including papers filed after the star. Skip
+   an id whose page is no longer in the library, and say so.
+3. Load each paper's page and PDF text as in step 8, downloading a missing PDF from the
+   page's `paper:pdf` link. With many papers, read the pages first and open each PDF
+   where the task needs its details.
+4. Say which papers you are using and which copies their stars came from, then do the
+   task.
 
 ## Ground rules
 
