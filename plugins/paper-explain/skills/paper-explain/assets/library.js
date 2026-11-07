@@ -1,11 +1,14 @@
-/* Stars and drop lists for the paper library. build_index.py copies this file to the
-   library root; the home page loads it as library.js, every paper page as ../../library.js.
+/* Stars, drop lists and new-tab links for the paper library. build_index.py copies this
+   file to the library root; the home page loads it as library.js, every paper page as
+   ../../library.js.
 
    A star marks a paper the user will work from, such as the papers for a related-work
    section. Stars live in the artifact's database, collection "stars", one doc per star:
      "<Project>"         a whole folder, including papers filed into it later
      "<Project>:<name>"  one paper, the page <Project>/artifact/<name>.html
    Claude reads that collection to gather the starred papers (SKILL.md, "Starred papers").
+   The doc "config/home", {url: "https://claude.ai/artifact/<id>"}, is the artifact's own
+   link (each account's copy has its own); links opened in a new tab need it (below).
    Where the page cannot reach the database (a saved copy, a signed-out viewer) the stars
    stay hidden, and everything else works as before. */
 (async () => {
@@ -15,6 +18,11 @@
   const home = document.getElementById("library");  // the home page's <main>; paper pages have none
   const folders = home ? [...home.querySelectorAll("details[data-proj]")] : [];
   let filter = "all";  // "starred" shows only starred papers; only the database can turn it on
+
+  // The home page opened at <artifact link>#<name> (a link opened in a new tab, below) shows that paper.
+  const want = home && location.hash.slice(1);
+  const card = want && [...home.querySelectorAll("ol.papers a")].find(a => a.getAttribute("href").endsWith("/" + want + ".html"));
+  if (card) return location.replace(card.getAttribute("href"));
 
   // Home page: each folder is a drop list, closed until opened. This browser remembers which are open.
   let opened = new Set();
@@ -31,7 +39,33 @@
   let db = null;
   try { db = await window.claude?.use?.("db"); } catch (e) { db = null; }
   if (!db) return;
+  newTabLinks();
   if (home) homeStars(); else paperStar();
+
+  // A page's address inside the artifact opens only the home page in a tab of its own. So while a
+  // new-tab gesture (middle click, Ctrl/Cmd/Shift click, right click, long press) is under way, a
+  // link to a library page carries <artifact link>#<name>, which the home page opens (above).
+  // A plain click keeps the page's own address and stays in this frame.
+  async function newTabLinks() {
+    let url = "";
+    try { url = (await db.doc("config/home").get()).data()?.url || ""; } catch (e) { /* no link: such tabs show the home page */ }
+    if (!/^https:\/\/claude\.ai\/[\w/-]+$/.test(url)) return;
+    const aim = (e, tab) => {
+      const a = e.target.closest?.("a[href]");
+      if (!(a instanceof HTMLAnchorElement)) return;
+      const own = a.dataset.href || a.getAttribute("href");
+      const u = new URL(own, location.href);
+      if (u.origin !== location.origin) return;  // other websites open in a new tab anyway
+      a.dataset.href = own;
+      const m = u.pathname.match(/\/artifact\/([^/]+)\.html$/);
+      a.setAttribute("href", tab ? url + (m ? "#" + m[1] : "") : own);
+    };
+    const tab = e => !!(e.button || e.ctrlKey || e.metaKey || e.shiftKey);
+    addEventListener("mousedown", e => aim(e, tab(e)), true);
+    addEventListener("keydown", e => e.key === "Enter" && aim(e, tab(e)), true);
+    addEventListener("contextmenu", e => aim(e, true), true);
+    addEventListener("touchstart", e => aim(e, true), { capture: true, passive: true });
+  }
 
   // The database shows a write to this page at once, through the snapshot, which redraws the stars.
   async function write(key, on, btn) {

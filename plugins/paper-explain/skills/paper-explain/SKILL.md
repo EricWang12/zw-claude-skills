@@ -347,7 +347,7 @@ python3 SKILL_DIR/scripts/build_index.py <root>
   at phone width.
 
 Fix every FAIL and every too-wide chart, then rerun it. `build_index.py` rewrites
-`<root>/index.html`, copies `library.js` (the stars and the folder drop lists) beside
+`<root>/index.html`, copies `library.js` (stars, folder drop lists, new-tab links) beside
 it, and prints every publishable file path.
 
 The whole library is **one** artifact, titled by the profile's "Artifact title" (Zhaoning
@@ -369,7 +369,14 @@ machine publish into the same one, so find it by its title on every run:
    `null`.
 3. **Not found:** create it with the whole library: `file_path: <root>/index.html`,
    `root: <root>`, `files:` every path the script printed (as `{"path": …}` items),
-   `capabilities: {"db": {}}`, `icon: "book"` and a one-sentence description.
+   `capabilities: {"db": {}}`, `icon: "book"` and a one-sentence description. Then give
+   it its own link, below.
+
+**The artifact's own link.** A link opened in a new tab must reach the artifact's
+claude.ai link, so `library.js` reads it from the artifact's database: the doc
+`config/home`, `{"url": "<artifact url>"}`. Write it with the ArtifactData tool (`set`)
+when you create the artifact, and whenever the user says a page opened in a new tab
+shows the home page instead. Each account's copy has its own.
 
 Artifact sources must sit under the session's working directory or scratchpad. If the
 library does not, copy `index.html`, `library.js` and the new files into the scratchpad
