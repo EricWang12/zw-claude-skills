@@ -28,7 +28,8 @@ and say "help me understand this". The skill:
 6. **Publishes it as a page of one artifact**, whose home page mirrors the folder tree.
    It finds the artifact by its title in your artifact list, so every machine publishes
    into the same one, and creates it if the list has none. Any link to a paper, opened
-   in a new tab, opens that paper there.
+   in a new tab, opens that paper there, and the address bar names the paper you are
+   reading, so a reload or a copied link reopens it.
 7. **Commits and pushes** the library, then loads the paper into the session so it can
    answer your follow-up questions.
 

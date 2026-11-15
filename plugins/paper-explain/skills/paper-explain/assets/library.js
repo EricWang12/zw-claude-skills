@@ -24,6 +24,17 @@
   const card = want && [...home.querySelectorAll("ol.papers a")].find(a => a.getAttribute("href").endsWith("/" + want + ".html"));
   if (card) return location.replace(card.getAttribute("href"));
 
+  // A paper page keeps #<its name> in its address. The viewer copies the page's hash into the
+  // claude.ai link in the address bar, so that link reopens this paper (reload, Copy link).
+  // A jump to a section (#problem, #stage-2) runs as usual, then the name comes back; a hash
+  // that names no element does not move the page.
+  const page = !home && location.pathname.match(/\/artifact\/([^/]+)\.html$/);
+  if (page) {
+    const mark = () => { if (location.hash !== "#" + page[1]) location.replace("#" + page[1]); };
+    if (!location.hash) mark();
+    addEventListener("hashchange", () => setTimeout(mark));  // after the page's own hashchange handler
+  }
+
   // Home page: each folder is a drop list, closed until opened. This browser remembers which are open.
   let opened = new Set();
   try { opened = new Set(JSON.parse(load("library.open") || "[]")); } catch (e) { /* bad value: all closed */ }
