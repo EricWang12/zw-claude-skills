@@ -12,6 +12,7 @@ and rules from `plugins/`.
 | [**reproduce**](plugins/reproduce/README.md) | Paste a GitHub repo or project page: it clones, builds a short-named env, picks the biggest model that fits the *free* GPU memory, runs ≥3 verified demos, and publishes a flow artifact where the real examples ride through the flowchart |
 | [**paper-explain**](plugins/paper-explain/README.md) | Paste a paper link: it files the PDF into your project library, crops the authors' figures, and writes a visual explainer — the problem shown on one running example, then big picture → stages → details — published as a page of one shared artifact, with the library synced to its GitHub repo |
 | [**transcribe-meeting**](plugins/transcribe-meeting/README.md) | Give it a recording path: it transcribes on your GPU in the original language (code-switching kept), reviews loops and missed quiet speech, and writes a summary where every point opens its source passage and plays that clip at its original HH:MM:SS — all local |
+| [**color-groups**](plugins/color-groups/README.md) | `claude-groups`, a terminal panel in place of the agent view: your background sessions with Completed grouped by `/color`, each color renamable to a project name; Enter opens a session and ← in it comes back to the panel. A script, not a plugin: link it as `cgs` (its README) |
 
 ## Install
 
@@ -129,6 +130,10 @@ plugins/
     .codex-plugin/plugin.json
     README.md
     skills/transcribe-meeting/       recording path -> local GPU transcript, review, source-linked summary with playback
+  color-groups/
+    README.md
+    claude-groups                    agent-view stand-in: sessions grouped by color, ← comes back here
+    test_claude_groups.py            python3 -m unittest plugins/color-groups/test_claude_groups.py
 docs/AGENT-GUIDE.md                  how terminal-driven breakpoints work, portably
 install.sh                           manual install of every plugin's skills
 ```

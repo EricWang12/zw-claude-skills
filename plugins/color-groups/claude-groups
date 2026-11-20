@@ -1,0 +1,545 @@
+#!/usr/bin/env python3
+"""claude-groups: Claude Code's background sessions, grouped by color.
+
+A stand-in for the agent view (`claude agents`) drawn the way it draws: the
+same sections (Pinned, Needs input, Working, Completed), each session's name
+as a chip in its `/color` (Claude Code's own colors), and Completed split by
+color, each color renamable to a project name.
+
+Enter opens the focused session with `claude attach`. The left arrow in that
+session comes back here: on that key `claude attach` relaunches itself as
+`~/.local/bin/claude agents` (with CLAUDE_AGENTS_SELECT set), and this panel
+stops that relaunch before it draws and shows itself instead.
+
+usage: claude-groups [session id]   (the id is focused first)
+keys:  up/down move · enter open (with text typed: start a new session) ·
+       left reopen the last session · ctrl+g name the focused color ·
+       ctrl+s where colors group · ctrl+x stop a running session, twice
+       within 2 s remove it from the list (`claude rm`) · ctrl+o the built-in
+       agent view · esc clear · ctrl+c quit
+mouse: hover focuses a session · click opens it · click a heading folds it ·
+       the wheel moves
+"""
+
+import codecs
+import json
+import os
+import select
+import signal
+import subprocess
+import sys
+import termios
+import time
+import tty
+import unicodedata
+from datetime import datetime, timezone
+from pathlib import Path
+
+CONFIG = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude')
+JOBS = CONFIG / 'jobs'
+NAMES = Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config') / 'claude-groups.json'
+
+# Claude Code 2.1.319's agent colors (its `<color>_FOR_SUBAGENTS_ONLY` theme keys,
+# the same in its dark and light themes), in /color's order.
+AGENT = {
+    'red': (220, 38, 38), 'blue': (106, 155, 204), 'green': (22, 163, 74),
+    'yellow': (202, 138, 4), 'purple': (130, 125, 189), 'orange': (217, 119, 87),
+    'pink': (196, 102, 134), 'cyan': (8, 145, 178),
+}
+COLORS = list(AGENT)
+# The dark theme's other colors the agent view uses: `inactive` for details and
+# ages, `warning` for a session that needs input, `inverseText` on a chip, and
+# the focused row's background (256-color 237).
+GRAY = (153, 153, 153)
+WARNING = (255, 193, 7)
+INK = (0, 0, 0)
+FOCUS = (58, 58, 58)
+SPINNER = '·✢*✶✻✽'  # a working session's glyph, one frame after the other
+
+# The agent view's sections; a state not named here counts as completed.
+SECTIONS = [('Pinned', set()), ('Needs input', {'blocked'}), ('Working', {'working'}),
+            ('Completed', set())]
+# Where color groups are drawn: in Completed, in place of the sections, nowhere.
+MODES = ['completed', 'all', 'off']
+
+NAME_COLUMN = 50   # the agent view's name column, in cells
+POLL_S = 0.02      # how often an open session is checked for the left arrow's relaunch
+FRAME_S = 0.12     # redraw period while a spinner turns
+RELOAD_S = 2.0     # how often the sessions are read again
+CONFIRM_S = 2.0    # the time to press ctrl+x again: the agent view's 2 s (its docs)
+RUNNING = {'working', 'blocked'}  # states whose first ctrl+x stops the session
+TRUECOLOR = os.environ.get('COLORTERM') in ('truecolor', '24bit')
+# Terminal modes a stopped Claude TUI may leave on: mouse, focus and paste
+# reports, the kitty keyboard protocol; then the cursor is shown again.
+RESET = '\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1004l\x1b[?2004l\x1b[<u\x1b[?25h'
+
+
+# ---------------------------------------------------------------- the sessions
+
+def load_sessions(jobs=JOBS):
+    """Every job folder's state.json, newest first; one without a state is skipped."""
+    out = []
+    for folder in jobs.iterdir() if jobs.is_dir() else []:
+        try:
+            s = json.loads((folder / 'state.json').read_text())
+        except (OSError, ValueError):
+            continue
+        if not s.get('state'):
+            continue
+        out.append({
+            'id': folder.name,
+            'name': s.get('name') or folder.name,
+            'state': s['state'],
+            'color': s.get('color') or '',
+            'pinned': bool(s.get('pinned')),
+            'detail': s.get('needs') or s.get('detail') or '',
+            'updated': s.get('updatedAt') or '',
+        })
+    return sorted(out, key=lambda s: s['updated'], reverse=True)
+
+
+def section_of(session):
+    if session['pinned']:
+        return 'Pinned'
+    return next((title for title, states in SECTIONS[1:] if session['state'] in states), 'Completed')
+
+
+def build_rows(sessions, names, mode, folded=()):
+    """The rows to draw, as dicts: section {key, title, count}, group {key, color,
+    label, count} and session {session, color}. A heading whose key is in
+    `folded` is drawn without its sessions, as the agent view folds one."""
+    rows = []
+
+    def by_color(members):
+        for color in COLORS + ['']:
+            group = [s for s in members if s['color'] == color]
+            if group:
+                key = f'color:{color}'
+                label = names.get(color, color) if color else 'no color'
+                rows.append({'kind': 'group', 'key': key, 'color': color, 'label': label,
+                             'count': len(group), 'folded': key in folded})
+                if key not in folded:
+                    rows.extend({'kind': 'session', 'session': s, 'color': s['color']} for s in group)
+
+    if mode == 'all':
+        by_color(sessions)
+        return rows
+    for title, _ in SECTIONS:
+        members = [s for s in sessions if section_of(s) == title]
+        if not members:
+            continue
+        key = f'section:{title}'
+        rows.append({'kind': 'section', 'key': key, 'title': title, 'count': len(members),
+                     'folded': key in folded})
+        if key in folded:
+            continue
+        if title == 'Completed' and mode == 'completed':
+            by_color(members)
+        else:
+            rows.extend({'kind': 'session', 'session': s, 'color': s['color']} for s in members)
+    return rows
+
+
+def age(stamp):
+    try:
+        then = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
+    except ValueError:
+        return ''
+    s = (datetime.now(timezone.utc) - then).total_seconds()
+    for unit, size in (('d', 86400), ('h', 3600), ('m', 60)):
+        if s >= size:
+            return f'{int(s // size)}{unit}'
+    return f'{int(max(s, 0))}s'
+
+
+def read_names():
+    try:
+        return json.loads(NAMES.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def write_names(names):
+    NAMES.parent.mkdir(parents=True, exist_ok=True)
+    NAMES.write_text(json.dumps(names, indent=1) + '\n')
+
+
+# ------------------------------------------------------------- drawing
+
+def ansi256(r, g, b):
+    """The 256-color code chalk draws an rgb color as, where truecolor is off."""
+    if r == g == b:
+        if r < 8:
+            return 16
+        if r > 248:
+            return 231
+        return round(((r - 8) / 247) * 24) + 232
+    return 16 + 36 * round(r / 255 * 5) + 6 * round(g / 255 * 5) + round(b / 255 * 5)
+
+
+def fg(rgb):
+    return f'\x1b[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m' if TRUECOLOR else f'\x1b[38;5;{ansi256(*rgb)}m'
+
+
+def bg(rgb):
+    return f'\x1b[48;2;{rgb[0]};{rgb[1]};{rgb[2]}m' if TRUECOLOR else f'\x1b[48;5;{ansi256(*rgb)}m'
+
+
+BOLD = '\x1b[1m'
+OFF = '\x1b[0m'
+
+
+def cells(text):
+    """How many terminal cells the text takes: wide (CJK) characters take two."""
+    return sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text)
+
+
+def fit(text, room):
+    """The longest start of `text` that takes at most `room` cells."""
+    used = 0
+    for i, c in enumerate(text):
+        used += 2 if unicodedata.east_asian_width(c) in 'WF' else 1
+        if used > room:
+            return text[:i]
+    return text
+
+
+def cut(text, room):
+    """`text` in at most `room` cells, ending in … when cut."""
+    if cells(text) <= room:
+        return text
+    return fit(text, room - 1) + '…' if room > 0 else ''
+
+
+def row(pieces, width, base=''):
+    """One screen row from (text, style) pieces, at most `width` cells; `base`
+    styles the whole row (the focus background) and fills it to the end."""
+    out, used = [], 0
+    for text, style in pieces:
+        piece = fit(text, width - used)
+        out.append(base + style + piece + OFF)
+        used += cells(piece)
+    if base:
+        out.append(base + ' ' * (width - used) + OFF)
+    return ''.join(out)
+
+
+def session_row(s, width, focused, mode, frame):
+    """A session as the agent view draws it: glyph, name chip, detail, age."""
+    if s['state'] == 'blocked':
+        glyph, glyph_style = '✻', fg(WARNING)
+    elif s['state'] == 'working':
+        glyph, glyph_style = SPINNER[frame % len(SPINNER)], fg(GRAY)
+    else:
+        glyph, glyph_style = '∙', fg(GRAY)
+    name_room = min(NAME_COLUMN, max(12, (width - 12) // 3))
+    name = cut(s['name'], name_room)
+    chip = bg(AGENT[s['color']]) + fg(INK) if s['color'] in AGENT else ''
+    when = age(s['updated'])
+    detail = s['detail'].replace('\n', ' ')
+    if mode == 'all':
+        detail = f'{section_of(s).lower()} · {detail}' if detail else section_of(s).lower()
+    detail_room = width - 3 - name_room - 2 - len(when) - 2
+    pieces = [(' ', ''), (glyph, glyph_style), (' ', ''), (name, chip),
+              (' ' * (name_room - cells(name) + 2), ''),
+              (cut(detail, detail_room), fg(GRAY))]
+    used = sum(cells(text) for text, _ in pieces)
+    pieces += [(' ' * max(1, width - used - len(when) - 1), ''), (when, fg(GRAY))]
+    return row(pieces, width, bg(FOCUS) if focused else '')
+
+
+def render(width, height, rows, sessions, focus_id, top, mode, prompt, asking, note, frame):
+    """The whole screen as a string; returns it, the scroll top it used, and what
+    each screen line shows ({line: ('session', id) or ('heading', key)}) for clicks."""
+    waiting = sum(s['state'] == 'blocked' for s in sessions)
+    working = sum(s['state'] == 'working' for s in sessions)
+    lines = [
+        row([(' Claude Code agents', BOLD), (' · color groups: ' + mode, fg(GRAY))], width),
+        row([(f' {waiting} awaiting input · {working} working · '
+              f'{len(sessions) - waiting - working} completed', fg(GRAY))], width),
+        '',
+    ]
+    room = max(1, height - len(lines) - 5)  # 4 footer lines and one blank above them
+    at = next((i for i, r in enumerate(rows) if r['kind'] == 'session' and r['session']['id'] == focus_id), 0)
+    top = max(0, min(max(top, at - room + 1), at, len(rows) - room))
+    hits = {}
+    for r in rows[top:top + room]:
+        line = len(lines) + 1
+        if r['kind'] == 'section':
+            mark = ('▸ ', f'  {r["count"]}') if r['folded'] else ('', '')
+            lines.append(row([(mark[0] + r['title'], ''), (mark[1], fg(GRAY))], width))
+            hits[line] = ('heading', r['key'])
+        elif r['kind'] == 'group':
+            chip = bg(AGENT[r['color']]) + fg(INK) + BOLD if r['color'] in AGENT else fg(GRAY) + BOLD
+            count = f'  {r["count"]}' + ('  ▸' if r['folded'] else '')
+            lines.append(row([(' ', ''), (f' {r["label"]} ', chip), (count, fg(GRAY))], width))
+            hits[line] = ('heading', r['key'])
+        else:
+            lines.append(session_row(r['session'], width, r['session']['id'] == focus_id, mode, frame))
+            hits[line] = ('session', r['session']['id'])
+    lines += [''] * (height - 4 - len(lines))
+    rule = fg(GRAY) + '─' * width + OFF
+    if asking:
+        box = row([('❯ ', ''), (f'name for {asking} (empty: {asking}): ', BOLD), (prompt, '')], width)
+    elif prompt:
+        box = row([('❯ ', ''), (prompt, '')], width)
+    else:
+        box = row([('❯ ', ''), ('describe a task for a new session', fg(GRAY))], width)
+    hints = note or ('enter to open · ← last · ctrl+g name color · ctrl+s colors · '
+                     'ctrl+x stop (twice: remove) · ctrl+o agent view · ctrl+c quit')
+    lines += [rule, box, rule, row([('  ' + hints, fg(GRAY))], width)]
+    screen = ''.join(f'\x1b[{i};1H{line}\x1b[K' for i, line in enumerate(lines[:height], start=1))
+    return screen, top, hits
+
+
+# ------------------------------------------------------------- the terminal
+
+class Terminal:
+    """Raw keys in, full screens out; `pause()` hands the terminal to a child."""
+
+    def __init__(self):
+        self.fd = sys.stdin.fileno()
+        self.saved = termios.tcgetattr(self.fd)
+        self.decode = codecs.getincrementaldecoder('utf-8')(errors='ignore')
+
+    def start(self):
+        tty.setraw(self.fd)
+        # alternate screen, no cursor, pastes bracketed so a pasted newline is not
+        # enter, and the mouse reported (every move, SGR coordinates) as the agent
+        # view has it: hover focuses, a click opens
+        sys.stdout.write('\x1b[?1049h\x1b[?25l\x1b[?2004h\x1b[?1003h\x1b[?1006h\x1b[2J')
+        sys.stdout.flush()
+
+    def stop(self):
+        sys.stdout.write(OFF + '\x1b[2J\x1b[?1006l\x1b[?1003l\x1b[?2004l\x1b[?25h\x1b[?1049l')
+        sys.stdout.flush()
+        termios.tcsetattr(self.fd, termios.TCSADRAIN, self.saved)
+
+    def draw(self, screen):
+        sys.stdout.write(screen)
+        sys.stdout.flush()
+
+    def keys(self, timeout):
+        """The keys pressed within `timeout` seconds: names for special keys,
+        the characters themselves for text."""
+        ready, _, _ = select.select([self.fd], [], [], timeout)
+        if not ready:
+            return []
+        return parse(self.decode.decode(os.read(self.fd, 4096)))
+
+
+SPECIAL = {
+    '\x1b[A': 'up', '\x1b[B': 'down', '\x1b[C': 'right', '\x1b[D': 'left',
+    '\x1bOA': 'up', '\x1bOB': 'down', '\x1bOC': 'right', '\x1bOD': 'left',
+    '\x1b[5~': 'pgup', '\x1b[6~': 'pgdn', '\x1b[H': 'home', '\x1b[F': 'end',
+    '\x1b[1~': 'home', '\x1b[4~': 'end', '\r': 'enter', '\n': 'enter',
+    '\x7f': 'backspace', '\x08': 'backspace', '\x03': 'ctrl+c', '\x04': 'ctrl+d',
+    '\x07': 'ctrl+g', '\x0f': 'ctrl+o', '\x13': 'ctrl+s', '\x18': 'ctrl+x',
+}
+
+
+def mouse(seq):
+    """An SGR mouse report ESC[<b;x;yM (press) or ...m (release) as
+    ('mouse', b, x, y, pressed); b holds 32 for a move, 64/65 for the wheel."""
+    try:
+        b, x, y = (int(part) for part in seq[3:-1].split(';'))
+    except ValueError:
+        return 'unknown'
+    return ('mouse', b, x, y, seq[-1] == 'M')
+
+
+def parse(text):
+    """Splits what the terminal sent into keys (see SPECIAL); a lone escape is 'esc',
+    a mouse report a tuple (see `mouse`), and a bracketed paste its characters,
+    its line breaks as spaces."""
+    out, i = [], 0
+    while i < len(text):
+        if text.startswith('\x1b[200~', i):
+            end = text.find('\x1b[201~', i)
+            end = len(text) if end < 0 else end
+            out.extend(' ' if c in '\r\n' else c for c in text[i + 6:end] if c.isprintable() or c in '\r\n')
+            i = end + 6
+            continue
+        if text[i] == '\x1b':
+            j = i + 1
+            if j < len(text) and text[j] in '[O':
+                j += 1
+                while j < len(text) and not ('@' <= text[j] <= '~'):
+                    j += 1
+                seq = text[i:j + 1]
+                out.append(mouse(seq) if seq.startswith('\x1b[<') else SPECIAL.get(seq, 'unknown'))
+                i = j + 1
+                continue
+            out.append('esc')
+            i += 1
+            continue
+        out.append(SPECIAL.get(text[i], text[i]))
+        i += 1
+    return out
+
+
+# ------------------------------------------------------------- sessions opened
+
+def is_agent_view(pid):
+    """Whether the process now runs `claude agents`: the left arrow's relaunch."""
+    try:
+        argv = Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+    except OSError:
+        return False
+    return len(argv) > 1 and argv[1] == b'agents'
+
+
+def run(argv, intercept):
+    """Runs a claude command on this terminal; with `intercept`, stops its relaunch
+    as the agent view. Returns whether it was stopped so."""
+    child = subprocess.Popen(argv, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL))
+    stopped = False
+    while child.poll() is None:
+        if intercept and is_agent_view(child.pid):
+            child.terminate()
+            try:
+                child.wait(1)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait()
+            stopped = True
+            break
+        time.sleep(POLL_S)
+    sys.stdout.write(RESET)
+    sys.stdout.flush()
+    return stopped
+
+
+def quiet(argv):
+    """Runs a claude command without the terminal; returns its first line of output."""
+    done = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+    text = (done.stdout + done.stderr).strip()
+    return text.splitlines()[0] if text else f'{" ".join(argv[:2])} exited {done.returncode}'
+
+
+# ------------------------------------------------------------- the panel
+
+def nearest(focus_id, old_ids, ids):
+    """The session to focus when `focus_id` is gone from `ids` (folded away or
+    ended): the next one after it in the old order, else the last before it."""
+    if focus_id in ids or not ids:
+        return focus_id if focus_id in ids else None
+    if focus_id not in old_ids:
+        return ids[0]
+    at = old_ids.index(focus_id)
+    shown = set(ids)
+    after = [i for i in old_ids[at + 1:] if i in shown]
+    before = [i for i in old_ids[:at] if i in shown]
+    return after[0] if after else before[-1] if before else ids[0]
+
+
+def attach(term, target):
+    """Opens a session on this terminal; its left arrow comes back here."""
+    term.stop()
+    run(['claude', 'attach', target], intercept=True)
+    term.start()
+
+
+def main(focus_id):
+    term = Terminal()
+    term.start()
+    mode, top, last, prompt, asking, note = MODES[0], 0, focus_id, '', '', ''
+    pending_stop, loaded_at, sessions, names, folded, ids = None, 0.0, [], {}, set(), []
+    try:
+        while True:
+            if time.monotonic() - loaded_at > RELOAD_S:
+                sessions, names, loaded_at = load_sessions(), read_names(), time.monotonic()
+            rows = build_rows(sessions, names, mode, folded)
+            ids, old_ids = [r['session']['id'] for r in rows if r['kind'] == 'session'], ids
+            focus_id = nearest(focus_id, old_ids, ids)
+            width, height = os.get_terminal_size()
+            frame = int(time.monotonic() / FRAME_S)
+            screen, top, hits = render(width, height, rows, sessions, focus_id, top, mode,
+                                       prompt, asking, note, frame)
+            term.draw(screen)
+            spinning = any(s['state'] == 'working' for s in sessions)
+            for key in term.keys(FRAME_S if spinning else 0.5):
+                at = ids.index(focus_id) if focus_id in ids else 0
+                focused = next((s for s in sessions if s['id'] == focus_id), None)
+                if isinstance(key, tuple):
+                    _, button, _, y, pressed = key
+                    hit = hits.get(y)
+                    if button & 32:  # a move: hovering focuses a session, as in the agent view
+                        if hit and hit[0] == 'session':
+                            focus_id = hit[1]
+                    elif button in (64, 65) and ids:  # the wheel
+                        focus_id = ids[min(max(at + (3 if button == 65 else -3), 0), len(ids) - 1)]
+                    elif button == 0 and pressed and hit and hit[0] == 'heading':
+                        folded ^= {hit[1]}  # a click on a heading folds or unfolds it
+                    elif button == 0 and pressed and hit:  # a click on a session opens it
+                        attach(term, hit[1])
+                        focus_id = last = hit[1]
+                        loaded_at = 0.0
+                        break
+                    continue
+                note = '' if key != 'ctrl+x' else note
+                if key in ('ctrl+c', 'ctrl+d', 'esc') and (prompt or asking):
+                    prompt, asking = '', ''
+                elif key in ('ctrl+c', 'ctrl+d'):
+                    return
+                elif key == 'backspace':
+                    prompt = prompt[:-1]
+                elif key == 'enter' and asking:
+                    if prompt.strip():
+                        names[asking] = prompt.strip()
+                    else:
+                        names.pop(asking, None)
+                    write_names(names)
+                    prompt, asking = '', ''
+                elif key == 'enter' and prompt.strip():
+                    note = quiet(['claude', '--bg', prompt.strip()])
+                    prompt, loaded_at = '', 0.0
+                elif key in ('enter', 'left') and ids and not prompt and not asking:
+                    target = last if key == 'left' else focus_id
+                    if not target:
+                        continue
+                    attach(term, target)
+                    focus_id = last = target
+                    loaded_at = 0.0
+                    break
+                elif key in ('down', 'up', 'pgdn', 'pgup', 'home', 'end') and ids:
+                    step = {'down': 1, 'up': -1, 'pgdn': height - 8, 'pgup': -(height - 8),
+                            'home': -len(ids), 'end': len(ids)}[key]
+                    focus_id = ids[min(max(at + step, 0), len(ids) - 1)]
+                elif key == 'ctrl+s':
+                    mode = MODES[(MODES.index(mode) + 1) % len(MODES)]
+                elif key == 'ctrl+g' and focused:
+                    if focused['color']:
+                        asking, prompt = focused['color'], names.get(focused['color'], '')
+                    else:
+                        note = f'{focused["name"]} has no color: give it one with /color in the session'
+                elif key == 'ctrl+x' and focused:
+                    # as in the agent view: the first press stops a running session,
+                    # a second press within CONFIRM_S removes it from the list
+                    if pending_stop and pending_stop[0] == focused['id'] and \
+                            time.monotonic() - pending_stop[1] < CONFIRM_S:
+                        note, pending_stop = quiet(['claude', 'rm', focused['id']]), None
+                    else:
+                        if focused['state'] in RUNNING:
+                            note = quiet(['claude', 'stop', focused['id']]) + ' · ctrl+x again to remove it'
+                        else:
+                            note = f'ctrl+x again to remove {focused["name"]} from the list'
+                        # the window opens once the hint shows, after a stop that can take seconds
+                        pending_stop = (focused['id'], time.monotonic())
+                    loaded_at = 0.0
+                elif key == 'ctrl+o':
+                    term.stop()
+                    run(['claude', 'agents'], intercept=False)
+                    term.start()
+                    loaded_at = 0.0
+                elif len(key) == 1 and key.isprintable():
+                    prompt += key
+    finally:
+        term.stop()
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] in ('-h', '--help'):
+        print(__doc__)
+        sys.exit(0)
+    main(sys.argv[1] if len(sys.argv) > 1 else os.environ.get('CLAUDE_AGENTS_SELECT'))
