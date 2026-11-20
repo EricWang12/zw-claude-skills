@@ -33,6 +33,9 @@ and say "help me understand this". The skill:
 7. **Commits and pushes** the library, then loads the paper into the session so it can
    answer your follow-up questions.
 
+**Recent.** The 最近一周 tab under the title shows only the papers filed in the last 7
+days. Each stays in its own project folder; the tab is a view.
+
 **Stars.** On the library pages, star a paper (the star on its card, or 星标 in its top
 bar) or a whole folder (整个文件夹, by the folder's name). The 星标 switch under the title
 shows only the starred papers. Ask for "my starred papers" and the skill reads the stars

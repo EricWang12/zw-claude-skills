@@ -1,4 +1,4 @@
-/* Stars, drop lists and new-tab links for the paper library. build_index.py copies this
+/* Tabs, stars, drop lists and new-tab links for the paper library. build_index.py copies this
    file to the library root; the home page loads it as library.js, every paper page as
    ../../library.js.
 
@@ -10,14 +10,18 @@
    The doc "config/home", {url: "https://claude.ai/artifact/<id>"}, is the artifact's own
    link (each account's copy has its own); links opened in a new tab need it (below).
    Where the page cannot reach the database (a saved copy, a signed-out viewer) the stars
-   stay hidden, and everything else works as before. */
+   stay hidden, and everything else works as before.
+
+   The home page's tabs (全部, 最近一周, 星标) only hide cards: every paper stays in its own
+   folder. 最近一周 shows the papers filed in the last 7 days, by the date in the page's name. */
 (async () => {
   const ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.85 5.9 6.5.85-4.75 4.5 1.2 6.45L12 17.4l-5.8 3.1 1.2-6.45-4.75-4.5 6.5-.85z"/></svg>';
   const load = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: forget it */ } };
   const home = document.getElementById("library");  // the home page's <main>; paper pages have none
   const folders = home ? [...home.querySelectorAll("details[data-proj]")] : [];
-  let filter = "all";  // "starred" shows only starred papers; only the database can turn it on
+  let filter = "all";  // "recent": papers filed in the last 7 days. "starred": starred papers, which needs the database
+  let stars = new Set();
 
   // The home page opened at <artifact link>#<name> (a link opened in a new tab, below) shows that paper.
   const want = home && location.hash.slice(1);
@@ -38,7 +42,6 @@
   // Home page: each folder is a drop list, closed until opened. This browser remembers which are open.
   let opened = new Set();
   try { opened = new Set(JSON.parse(load("library.open") || "[]")); } catch (e) { /* bad value: all closed */ }
-  for (const d of folders) d.open = opened.has(d.dataset.proj);
   home?.addEventListener("click", e => {
     const summary = e.target.closest("summary");
     if (!summary || e.target.closest("button") || filter !== "all") return;
@@ -46,6 +49,49 @@
     summary.parentElement.open ? opened.delete(p) : opened.add(p);  // the folder toggles right after this click
     save("library.open", JSON.stringify([...opened]));
   });
+
+  function render() {
+    let nStar = 0, nRecent = 0;
+    for (const d of folders) {
+      const whole = stars.has(d.dataset.proj);
+      let shown = 0;
+      d.querySelector(".fstar").setAttribute("aria-pressed", whole);
+      for (const b of d.querySelectorAll(".star")) {
+        const li = b.parentElement;
+        const own = stars.has(b.dataset.star);
+        const recent = Date.now() - new Date(li.dataset.added + "T00:00") < 8 * 864e5;  // filed today or in the 7 days before
+        b.setAttribute("aria-pressed", own);
+        if (whole || own) nStar++;
+        if (recent) nRecent++;
+        li.hidden = filter === "starred" ? !(whole || own) : filter === "recent" && !recent;
+        if (!li.hidden) shown++;
+      }
+      d.hidden = filter !== "all" && !shown;
+    }
+    document.getElementById("star-count").textContent = nStar;
+    document.getElementById("recent-count").textContent = nRecent;
+    for (const b of document.querySelectorAll("#star-filter [data-filter]")) b.setAttribute("aria-pressed", b.dataset.filter === filter);
+    document.getElementById("star-hint").hidden = filter !== "starred" || !nStar;
+    document.getElementById("star-empty").hidden = filter !== "starred" || nStar > 0;
+    document.getElementById("recent-empty").hidden = filter !== "recent" || nRecent > 0;
+  }
+
+  function setFilter(f) {
+    filter = f;
+    render();
+    // Recent, Starred: open every folder that shows a paper. All: back to the folders this browser opened.
+    for (const d of folders) d.open = f === "all" ? opened.has(d.dataset.proj) : !d.hidden;
+  }
+
+  if (home) {
+    document.getElementById("star-filter").addEventListener("click", e => {
+      const b = e.target.closest("[data-filter]");
+      if (!b || b.dataset.filter === filter) return;
+      save("library.filter", b.dataset.filter);  // this browser reopens on the same tab
+      setFilter(b.dataset.filter);
+    });
+    setFilter(load("library.filter") === "recent" ? "recent" : "all");  // "starred" waits for the database
+  }
 
   let db = null;
   try { db = await window.claude?.use?.("db"); } catch (e) { db = null; }
@@ -93,51 +139,14 @@
   }
 
   function homeStars() {
-    const seg = document.getElementById("star-filter");
-    const hint = document.getElementById("star-hint");
-    const empty = document.getElementById("star-empty");
-    let stars = new Set(), first = true;
-
-    function render() {
-      let n = 0;
-      for (const d of folders) {
-        const whole = stars.has(d.dataset.proj);
-        let shown = 0;
-        d.querySelector(".fstar").setAttribute("aria-pressed", whole);
-        for (const b of d.querySelectorAll(".star")) {
-          const own = stars.has(b.dataset.star);
-          b.setAttribute("aria-pressed", own);
-          if (whole || own) { n++; shown++; }
-          b.parentElement.hidden = filter === "starred" && !(whole || own);
-        }
-        d.hidden = filter === "starred" && !shown;
-      }
-      document.getElementById("star-count").textContent = n;
-      for (const b of seg.querySelectorAll("[data-filter]")) b.setAttribute("aria-pressed", b.dataset.filter === filter);
-      hint.hidden = filter !== "starred" || !n;
-      empty.hidden = filter !== "starred" || n > 0;
-    }
-
-    function setFilter(f) {
-      filter = f;
-      save("library.filter", f);
-      render();
-      // Starred: open every folder that shows a paper. All: back to the folders this browser opened.
-      for (const d of folders) d.open = f === "starred" ? !d.hidden : opened.has(d.dataset.proj);
-    }
-
+    let first = true;
     db.collection("stars").onSnapshot(snap => {
       stars = new Set(snap.docs.map(d => d.id));
-      if (!first) return render();
+      if (first) document.documentElement.classList.add("stars-on");
+      if (first && load("library.filter") === "starred") setFilter("starred"); else render();
       first = false;
-      document.documentElement.classList.add("stars-on");
-      setFilter(load("library.filter") === "starred" ? "starred" : "all");
     }, e => console.warn("stars unavailable:", e && e.code));
 
-    seg.addEventListener("click", e => {
-      const b = e.target.closest("[data-filter]");
-      if (b && b.dataset.filter !== filter) setFilter(b.dataset.filter);
-    });
     home.addEventListener("click", e => {
       const b = e.target.closest("button[data-star]");
       if (!b) return;

@@ -347,8 +347,8 @@ python3 SKILL_DIR/scripts/build_index.py <root>
   at phone width.
 
 Fix every FAIL and every too-wide chart, then rerun it. `build_index.py` rewrites
-`<root>/index.html`, copies `library.js` (stars, folder drop lists, new-tab links) beside
-it, and prints every publishable file path.
+`<root>/index.html`, copies `library.js` (the 全部 / 最近一周 / 星标 tabs, stars, folder drop
+lists, new-tab links) beside it, and prints every publishable file path.
 
 The whole library is **one** artifact, titled by the profile's "Artifact title" (Zhaoning
 Paper Pile; `build_index.py` puts it in the home page's `<title>`). Agents on every
