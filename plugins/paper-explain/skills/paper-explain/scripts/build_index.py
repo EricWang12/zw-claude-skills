@@ -7,9 +7,13 @@ From each page it takes <title>, <meta name="description"> (the TL;DR line) and
 <meta name="paper:title">/<meta name="paper:venue">/<meta name="paper:date">. Every
 project folder is a drop list, newest paper first; an empty project shows as empty.
 
-Stars: every card and every folder header has a star button, and a switch under the
-title shows only the starred papers. They stay hidden until library.js, which this
-script copies from assets/ to LIBRARY/library.js, reaches the artifact's database.
+Tabs: a switch under the title shows all papers, the ones filed in the last 7 days
+(最近一周), or the starred ones. A tab only hides cards: every paper stays in its own
+project folder. library.js, which this script copies from assets/ to LIBRARY/library.js,
+runs the switch.
+
+Stars: every card and every folder header has a star button. The stars and their tab
+stay hidden until library.js reaches the artifact's database.
 
 index.html is written without <!doctype>/<head>/<body> because the Artifact tool
 wraps the main page in its own skeleton. Colors and fonts come from the
@@ -70,12 +74,12 @@ ol.papers a:hover { border-color: var(--accent); }
 .tldr { font-size: .9rem; color: var(--muted); }
 .empty { color: var(--muted); margin: .75rem 0 0; }
 /* stars: hidden until library.js reaches the artifact's database and sets .stars-on */
-.seg, .star, .fstar { display: none; }
-.stars-on .seg { display: inline-flex; }
+.star, .fstar, .seg [data-filter="starred"] { display: none; }
+.stars-on .seg [data-filter="starred"] { display: inline-flex; }
 .stars-on .star { display: grid; }
 .stars-on .fstar { display: inline-flex; }
 .stars-on ol.papers a { padding-right: 3rem; }
-.seg { margin-top: 1.25rem; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg { display: inline-flex; margin-top: 1.25rem; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
 .seg button { border: 0; background: var(--surface); color: var(--muted); font: 500 .8rem var(--f-mono);
   padding: .4rem .9rem; cursor: pointer; display: inline-flex; gap: .35rem; align-items: center; }
 .seg button + button { border-left: 1px solid var(--rule); }
@@ -121,7 +125,7 @@ def paper_item(root, page):
     published = meta(src, "paper:date")  # first public date (arXiv v1); the filing date goes below it
     when = f'<b>{e(published)}</b><small>归档 {e(date)}</small>' if published else e(date)
     key = f"{page.parent.parent.name}:{page.stem}"  # the star's id in the artifact's database
-    return (f'<li><a href="{e(page.relative_to(root).as_posix())}">'
+    return (f'<li data-added="{e(date)}"><a href="{e(page.relative_to(root).as_posix())}">'
             f'<span class="date">{when}</span>'
             f'<span class="name">{e(name)}</span>'
             f'<span class="title">{e(meta(src, "paper:title"))}{" · " + e(venue) if venue else ""}</span>'
@@ -159,9 +163,11 @@ def main():
   <code>{root.name}/</code> 一一对应，点名字展开。每张卡左边是论文首次公开的日期（arXiv v1 或 release），小字是归档日期。</p>
   <div class="seg" id="star-filter" role="group" aria-label="显示哪些 paper">
     <button type="button" data-filter="all" aria-pressed="true">全部 {total}</button>
+    <button type="button" data-filter="recent" aria-pressed="false">最近一周 <span id="recent-count">0</span></button>
     <button type="button" data-filter="starred" aria-pressed="false">{STAR}星标 <span id="star-count">0</span></button>
   </div>
   <p class="hint" id="star-hint" hidden>交给 Claude：说 <b>“用我的星标 paper 写 related work”</b>，它会自己读这份清单。</p>
+  <p class="hint" id="recent-empty" hidden>最近一周没有新归档的 paper。</p>
   <p class="hint" id="star-empty" hidden>还没有星标。点 paper 右上角的星，或文件夹旁的“整个文件夹”。</p>
 </header>
 <main class="frame" id="library">
