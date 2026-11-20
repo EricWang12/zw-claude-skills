@@ -50,7 +50,7 @@ def lines(rows):
 
 class Grouping(unittest.TestCase):
     def test_completed_is_split_by_color_in_color_order_with_names(self):
-        rows = lines(cg.build_rows(SESSIONS, {'blue': 'generation'}, 'completed'))
+        rows = lines(cg.build_rows(SESSIONS, {'blue': {'name': 'generation'}}, 'completed'))
         self.assertEqual(rows, [
             ('section', 'Pinned 1'), ('session', 'top'),
             ('section', 'Needs input 1'), ('session', 'needs'),
@@ -84,6 +84,47 @@ class Grouping(unittest.TestCase):
         self.assertNotIn('group', [kind for kind, _ in rows])
         self.assertEqual([item for kind, item in rows if kind == 'section'],
                          ['Pinned 1', 'Needs input 1', 'Working 1', 'Completed 4'])
+
+    def test_a_group_carries_its_note_and_a_note_alone_keeps_the_color_name(self):
+        labels = {'blue': {'name': 'generation', 'note': 'meshes and textures'},
+                  'red': {'note': 'urgent'}}
+        groups = {r['color']: r for r in cg.build_rows(SESSIONS, labels, 'completed') if r['kind'] == 'group'}
+        self.assertEqual((groups['blue']['label'], groups['blue']['note']), ('generation', 'meshes and textures'))
+        self.assertEqual((groups['red']['label'], groups['red']['note']), ('red', 'urgent'))
+        self.assertEqual(groups['']['note'], '')
+
+
+class Labels(unittest.TestCase):
+    def read(self, text):
+        with tempfile.TemporaryDirectory() as tmp:
+            saved, cg.NAMES = cg.NAMES, Path(tmp) / 'claude-groups.json'
+            try:
+                if text is not None:
+                    cg.NAMES.write_text(text)
+                return cg.read_labels()
+            finally:
+                cg.NAMES = saved
+
+    def test_names_and_notes_are_read_and_a_first_version_file_still_works(self):
+        self.assertEqual(self.read('{"blue": {"name": "generation", "note": "meshes"}}'),
+                         {'blue': {'name': 'generation', 'note': 'meshes'}})
+        self.assertEqual(self.read('{"blue": "generation", "red": {"note": "urgent"}}'),
+                         {'blue': {'name': 'generation'}, 'red': {'note': 'urgent'}})
+
+    def test_a_missing_or_broken_file_is_no_labels(self):
+        self.assertEqual(self.read(None), {})
+        self.assertEqual(self.read('{broken'), {})
+        self.assertEqual(self.read('["blue"]'), {})
+
+    def test_labels_written_are_read_back_whole(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            saved, cg.NAMES = cg.NAMES, Path(tmp) / 'sub' / 'claude-groups.json'
+            try:
+                labels = {'blue': {'name': '生成', 'note': 'meshes · textures'}}
+                cg.write_labels(labels)
+                self.assertEqual(cg.read_labels(), labels)
+            finally:
+                cg.NAMES = saved
 
 
 class Colors(unittest.TestCase):
@@ -159,6 +200,31 @@ class Clicks(unittest.TestCase):
         drawn = [hits[line] for line in sorted(hits)]
         self.assertIn(('heading', 'color:blue'), drawn)
         self.assertEqual(drawn.index(('session', 'mesh')), drawn.index(('heading', 'color:blue')) + 1)
+
+
+class Notes(unittest.TestCase):
+    def heading(self, width, labels):
+        cg.TRUECOLOR = True
+        rows = cg.build_rows(SESSIONS, labels, 'completed')
+        screen, _, hits = cg.render(width, 40, rows, SESSIONS, 'mesh', 0, 'completed', '', '', '', 0)
+        line = next(line for line, hit in hits.items() if hit == ('heading', 'color:blue'))
+        drawn = screen.split(f'\x1b[{line};1H')[1].split('\x1b[K')[0]
+        return re.sub(r'\x1b\[[0-9;]*m', '', drawn)
+
+    def test_the_note_follows_the_heading_and_its_count(self):
+        text = self.heading(120, {'blue': {'name': 'generation', 'note': 'meshes and textures'}})
+        self.assertEqual(text, '  generation   2  meshes and textures')
+
+    def test_a_long_note_is_cut_to_the_width(self):
+        text = self.heading(40, {'blue': {'name': 'generation', 'note': 'meshes ' * 20}})
+        self.assertLessEqual(cg.cells(text), 40)
+        self.assertTrue(text.endswith('…'))
+
+    def test_the_prompt_shows_the_question(self):
+        cg.TRUECOLOR = True
+        screen, _, _ = cg.render(120, 40, [], SESSIONS, None, 0, 'completed', 'meshes',
+                                 'note for generation (empty: none): ', '', 0)
+        self.assertIn('note for generation (empty: none): ', re.sub(r'\x1b\[[0-9;]*m', '', screen))
 
 
 class Loading(unittest.TestCase):

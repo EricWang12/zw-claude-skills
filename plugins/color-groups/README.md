@@ -3,7 +3,8 @@
 `claude-groups` is a terminal panel in place of Claude Code's agent view (`claude agents`),
 drawn the way the agent view draws: Pinned, Needs input, Working and Completed, each
 session's name as a chip in its `/color`, and **Completed grouped by color**, each color
-renamable to a project name. Enter opens a session; **← in that session comes back here**.
+renamable to a project name with a **short note** beside it. Enter opens a session; **← in
+that session comes back here**.
 
 ![panel](panel.png)
 
@@ -24,14 +25,17 @@ cgs                                                                # or: cgs <se
 | type, then Enter | start a new background session with that task (`claude --bg`), as the agent view's prompt does |
 | ← in a session | come back here, the session focused |
 | ← here | open the last session again |
-| Ctrl+G | name the focused session's color (empty: its color name back) |
+| Ctrl+G | name the focused session's color, then give it a short note shown beside its heading (each prompt starts from what is saved; empty clears it; Esc stops) |
 | Ctrl+S | where colors group: Completed → every section → off |
 | Ctrl+X | as in the agent view: stop the focused session if it is running (`claude stop`); a second Ctrl+X within 2 s removes it from the list (`claude rm`: its worktree is deleted only when that is safe, its conversation stays in `claude --resume`) |
 | Ctrl+O | the built-in agent view |
 | Esc | clear the prompt; Ctrl+C quits |
 | Mouse | as in the agent view: hover focuses a session, a click opens it, a click on a heading folds or unfolds it, the wheel moves |
 
-Names are kept in `~/.config/claude-groups.json`. A session changes only when you stop it.
+Names and notes are kept in `~/.config/claude-groups.json` as
+`{"blue": {"name": "generation", "note": "meshes and textures"}}`; you can edit the file by
+hand too (a name-only file of the first version, `{"blue": "generation"}`, still reads).
+A session changes only when you stop or remove it.
 
 ## Colors
 

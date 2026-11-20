@@ -4,7 +4,7 @@
 A stand-in for the agent view (`claude agents`) drawn the way it draws: the
 same sections (Pinned, Needs input, Working, Completed), each session's name
 as a chip in its `/color` (Claude Code's own colors), and Completed split by
-color, each color renamable to a project name.
+color, each color renamable to a project name with a short note of its own.
 
 Enter opens the focused session with `claude attach`. The left arrow in that
 session comes back here: on that key `claude attach` relaunches itself as
@@ -13,7 +13,8 @@ stops that relaunch before it draws and shows itself instead.
 
 usage: claude-groups [session id]   (the id is focused first)
 keys:  up/down move · enter open (with text typed: start a new session) ·
-       left reopen the last session · ctrl+g name the focused color ·
+       left reopen the last session · ctrl+g name the focused color, then
+       give it a short note shown beside its heading ·
        ctrl+s where colors group · ctrl+x stop a running session, twice
        within 2 s remove it from the list (`claude rm`) · ctrl+o the built-in
        agent view · esc clear · ctrl+c quit
@@ -104,10 +105,11 @@ def section_of(session):
     return next((title for title, states in SECTIONS[1:] if session['state'] in states), 'Completed')
 
 
-def build_rows(sessions, names, mode, folded=()):
+def build_rows(sessions, labels, mode, folded=()):
     """The rows to draw, as dicts: section {key, title, count}, group {key, color,
-    label, count} and session {session, color}. A heading whose key is in
-    `folded` is drawn without its sessions, as the agent view folds one."""
+    label, note, count} and session {session, color}. `labels` is what
+    `read_labels` gives. A heading whose key is in `folded` is drawn without its
+    sessions, as the agent view folds one."""
     rows = []
 
     def by_color(members):
@@ -115,9 +117,11 @@ def build_rows(sessions, names, mode, folded=()):
             group = [s for s in members if s['color'] == color]
             if group:
                 key = f'color:{color}'
-                label = names.get(color, color) if color else 'no color'
+                saved = labels.get(color, {})
+                label = (saved.get('name') or color) if color else 'no color'
                 rows.append({'kind': 'group', 'key': key, 'color': color, 'label': label,
-                             'count': len(group), 'folded': key in folded})
+                             'note': saved.get('note', ''), 'count': len(group),
+                             'folded': key in folded})
                 if key not in folded:
                     rows.extend({'kind': 'session', 'session': s, 'color': s['color']} for s in group)
 
@@ -152,16 +156,22 @@ def age(stamp):
     return f'{int(max(s, 0))}s'
 
 
-def read_names():
+def read_labels():
+    """Each color's label: {color: {'name': ..., 'note': ...}}, either key absent.
+    A file of the first version holds a name alone ({color: name}): read as that name."""
     try:
-        return json.loads(NAMES.read_text())
+        saved = json.loads(NAMES.read_text())
     except (OSError, ValueError):
         return {}
+    if not isinstance(saved, dict):
+        return {}
+    return {color: dict(value) if isinstance(value, dict) else {'name': value}
+            for color, value in saved.items() if isinstance(value, (dict, str))}
 
 
-def write_names(names):
+def write_labels(labels):
     NAMES.parent.mkdir(parents=True, exist_ok=True)
-    NAMES.write_text(json.dumps(names, indent=1) + '\n')
+    NAMES.write_text(json.dumps(labels, indent=1, ensure_ascii=False) + '\n')
 
 
 # ------------------------------------------------------------- drawing
@@ -186,6 +196,7 @@ def bg(rgb):
 
 
 BOLD = '\x1b[1m'
+ITALIC = '\x1b[3m'
 OFF = '\x1b[0m'
 
 
@@ -248,9 +259,10 @@ def session_row(s, width, focused, mode, frame):
     return row(pieces, width, bg(FOCUS) if focused else '')
 
 
-def render(width, height, rows, sessions, focus_id, top, mode, prompt, asking, note, frame):
+def render(width, height, rows, sessions, focus_id, top, mode, prompt, question, note, frame):
     """The whole screen as a string; returns it, the scroll top it used, and what
-    each screen line shows ({line: ('session', id) or ('heading', key)}) for clicks."""
+    each screen line shows ({line: ('session', id) or ('heading', key)}) for clicks.
+    `question` heads the prompt while a color's name or note is asked for."""
     waiting = sum(s['state'] == 'blocked' for s in sessions)
     working = sum(s['state'] == 'working' for s in sessions)
     lines = [
@@ -272,20 +284,24 @@ def render(width, height, rows, sessions, focus_id, top, mode, prompt, asking, n
         elif r['kind'] == 'group':
             chip = bg(AGENT[r['color']]) + fg(INK) + BOLD if r['color'] in AGENT else fg(GRAY) + BOLD
             count = f'  {r["count"]}' + ('  ▸' if r['folded'] else '')
-            lines.append(row([(' ', ''), (f' {r["label"]} ', chip), (count, fg(GRAY))], width))
+            pieces = [(' ', ''), (f' {r["label"]} ', chip), (count, fg(GRAY))]
+            if r['note']:  # the color's short note, after its count so the counts line up
+                used = sum(cells(text) for text, _ in pieces)
+                pieces.append(('  ' + cut(r['note'], width - used - 3), fg(GRAY) + ITALIC))
+            lines.append(row(pieces, width))
             hits[line] = ('heading', r['key'])
         else:
             lines.append(session_row(r['session'], width, r['session']['id'] == focus_id, mode, frame))
             hits[line] = ('session', r['session']['id'])
     lines += [''] * (height - 4 - len(lines))
     rule = fg(GRAY) + '─' * width + OFF
-    if asking:
-        box = row([('❯ ', ''), (f'name for {asking} (empty: {asking}): ', BOLD), (prompt, '')], width)
+    if question:
+        box = row([('❯ ', ''), (question, BOLD), (prompt, '')], width)
     elif prompt:
         box = row([('❯ ', ''), (prompt, '')], width)
     else:
         box = row([('❯ ', ''), ('describe a task for a new session', fg(GRAY))], width)
-    hints = note or ('enter to open · ← last · ctrl+g name color · ctrl+s colors · '
+    hints = note or ('enter to open · ← last · ctrl+g name & note a color · ctrl+s colors · '
                      'ctrl+x stop (twice: remove) · ctrl+o agent view · ctrl+c quit')
     lines += [rule, box, rule, row([('  ' + hints, fg(GRAY))], width)]
     screen = ''.join(f'\x1b[{i};1H{line}\x1b[K' for i, line in enumerate(lines[:height], start=1))
@@ -443,19 +459,25 @@ def attach(term, target):
 def main(focus_id):
     term = Terminal()
     term.start()
-    mode, top, last, prompt, asking, note = MODES[0], 0, focus_id, '', '', ''
-    pending_stop, loaded_at, sessions, names, folded, ids = None, 0.0, [], {}, set(), []
+    mode, top, last, prompt, note = MODES[0], 0, focus_id, '', ''
+    asking = None  # ('name' or 'note', color) while ctrl+g asks for one of them
+    pending_stop, loaded_at, sessions, labels, folded, ids = None, 0.0, [], {}, set(), []
     try:
         while True:
             if time.monotonic() - loaded_at > RELOAD_S:
-                sessions, names, loaded_at = load_sessions(), read_names(), time.monotonic()
-            rows = build_rows(sessions, names, mode, folded)
+                sessions, labels, loaded_at = load_sessions(), read_labels(), time.monotonic()
+            rows = build_rows(sessions, labels, mode, folded)
             ids, old_ids = [r['session']['id'] for r in rows if r['kind'] == 'session'], ids
             focus_id = nearest(focus_id, old_ids, ids)
             width, height = os.get_terminal_size()
             frame = int(time.monotonic() / FRAME_S)
+            question = ''
+            if asking:
+                field, color = asking
+                question = (f'name for {color} (empty: {color}): ' if field == 'name' else
+                            f'note for {labels.get(color, {}).get("name") or color} (empty: none): ')
             screen, top, hits = render(width, height, rows, sessions, focus_id, top, mode,
-                                       prompt, asking, note, frame)
+                                       prompt, question, note, frame)
             term.draw(screen)
             spinning = any(s['state'] == 'working' for s in sessions)
             for key in term.keys(FRAME_S if spinning else 0.5):
@@ -479,18 +501,26 @@ def main(focus_id):
                     continue
                 note = '' if key != 'ctrl+x' else note
                 if key in ('ctrl+c', 'ctrl+d', 'esc') and (prompt or asking):
-                    prompt, asking = '', ''
+                    prompt, asking = '', None
                 elif key in ('ctrl+c', 'ctrl+d'):
                     return
                 elif key == 'backspace':
                     prompt = prompt[:-1]
                 elif key == 'enter' and asking:
+                    # save what was typed (empty clears it), then ask for the note
+                    field, color = asking
+                    saved = labels.setdefault(color, {})
                     if prompt.strip():
-                        names[asking] = prompt.strip()
+                        saved[field] = prompt.strip()
                     else:
-                        names.pop(asking, None)
-                    write_names(names)
-                    prompt, asking = '', ''
+                        saved.pop(field, None)
+                    if not saved:
+                        labels.pop(color)
+                    write_labels(labels)
+                    if field == 'name':
+                        asking, prompt = ('note', color), labels.get(color, {}).get('note', '')
+                    else:
+                        asking, prompt = None, ''
                 elif key == 'enter' and prompt.strip():
                     note = quiet(['claude', '--bg', prompt.strip()])
                     prompt, loaded_at = '', 0.0
@@ -508,9 +538,10 @@ def main(focus_id):
                     focus_id = ids[min(max(at + step, 0), len(ids) - 1)]
                 elif key == 'ctrl+s':
                     mode = MODES[(MODES.index(mode) + 1) % len(MODES)]
-                elif key == 'ctrl+g' and focused:
+                elif key == 'ctrl+g' and focused and not asking:
                     if focused['color']:
-                        asking, prompt = focused['color'], names.get(focused['color'], '')
+                        color = focused['color']
+                        asking, prompt = ('name', color), labels.get(color, {}).get('name', '')
                     else:
                         note = f'{focused["name"]} has no color: give it one with /color in the session'
                 elif key == 'ctrl+x' and focused:
