@@ -90,8 +90,20 @@ Both hosts load the same `skills/paper-explain/SKILL.md`.
 ## What you get back
 
 - The PDF and its explainer page in the library, committed and pushed
-- A link to the page in the library artifact (home → project → paper)
+- A link that opens the page directly: the library artifact's link plus `#<name>`
 - The project it was filed under and why, plus three TL;DR lines
-- A session that already holds the paper, ready for your questions
+- A session that already holds the paper, ready for your questions. Changes to the page
+  that come out of your questions and feedback wait on a list and go out together: an
+  hour after your last message, or as soon as you say "update the page"
 - `/remote-control` as the last line of the first reply: type it to continue the
   session from your phone or claude.ai/code
+- **The repo and the artifact kept whole, both ways.** Every run first gives each side what
+  the other has: a page explained in a claude.ai chat (artifact only) is copied into the
+  repo and pushed, and a page that never reached the artifact is published. Nothing is
+  deleted. A page changed on both sides keeps the repo's copy and is named; a page that
+  does not fit the artifact's 511-file cap stays in the repo and is named too
+  (`scripts/sync_plan.py` decides which way each page goes)
+- **Pages that brief an agent.** Every page, and the home page, carries a hidden
+  `agent-context` block (the paper's PDF, arXiv, project page and code links, the page's
+  file in the GitHub repo, the profile, how to answer and change it). Open the artifact on
+  claude.ai and ask the chat beside it: it reads the block, readers never see it

@@ -20,7 +20,7 @@ A paper the user calls temporary gets only the page, in an artifact of its own; 
 
 `SKILL_DIR` below is the directory containing this file.
 
-## 0. Sync the library, then read the profile
+## 0. Sync the library and the artifact, then read the profile
 
 The library is a git clone of **https://github.com/EricWang12/all_papers.git**, and
 `<root>` below is that clone. Use the first one that exists:
@@ -51,6 +51,36 @@ The template already encodes the page structure; the profile sets the voice and 
 emphasis. Where the profile and this file disagree, the profile wins, because it is the
 user's newer word.
 
+### Give the repo and the artifact what the other has
+
+A paper explained in a claude.ai chat reaches the artifact but often not the repo, and
+one explained here may never have reached the artifact. So every run, before its own
+paper, makes each side whole from the other. Nothing is ever deleted on either side.
+
+1. **Find the artifact**: `list` your artifacts (`limit: 200`) and take the one whose
+   title is exactly the profile's artifact title. Only your own count; one shared from
+   another account cannot take a publish. If there is none, skip this sync: step 6
+   creates the artifact with the whole library.
+2. **List it**: `read` it (the tool refuses to update an artifact this session has not
+   read), then `list` its files (`scope: "files"`). Write its pages to
+   `<scratchpad>/artifact-pages.txt`, one `<path> <sha256>` line for each `.html` under
+   `*/artifact/` as listed, and note the file count the listing starts with.
+3. **Plan**: `python3 SKILL_DIR/scripts/sync_plan.py <root> <scratchpad>/artifact-pages.txt --files <count>`.
+   It prints one line per page that must move, then `same <n>` and `room <n>`:
+   - `download <path>`: only in the artifact, or newer there (a page changed in a chat).
+     `read` the page and every listed file under its folder (`<path>` without `.html`)
+     with `paths`, and copy them from where the tool saved them into `<root>`, same paths.
+   - `upload <path>`: only here, or newer here; the lines after a page name its figures.
+   - `conflict <path>`: changed on both sides. The repo's copy stays; `read` the
+     artifact's into the scratchpad and tell the user.
+   - `wontfit <path>`: only here, but the artifact is full (at most 511 files a version,
+     40 kept free for new papers). It stays in the repo; tell the user.
+4. **Apply**: after any download, run `build_index.py` (step 6) and commit and push
+   (step 7) with the message `Sync from the artifact: <names>`. Then publish the `upload`
+   files, with `index.html` and `library.js`, as step 6 publishes.
+5. Say in one line what moved each way, and name every conflict and every page that did
+   not fit.
+
 ## 1. Find the paper and its metadata
 
 Resolve the link to a PDF URL. Don't download yet: the download path depends on the
@@ -74,9 +104,10 @@ and the PDF can disagree. Open the candidates and keep the page that links back 
 paper and, if there is one, a live code repository.
 
 **Already in the library?** Run `grep -sl "<arXiv ID or URL>" <root>/*/artifact/*.html || true`.
-If it is there, say so and point to its page instead of redoing it, unless the user asks
-for a redo. A redo reuses the crops. If this machine has no copy of the PDF, download
-it from the page's `paper:pdf` link.
+If it is there, say so and give its page link (`<artifact url>#<name>`, step 9; find the
+artifact as in step 6) instead of redoing it, unless the user asks for a redo. A redo
+reuses the crops. If this machine has no copy of the PDF, download it from the page's
+`paper:pdf` link.
 
 ## 2. Name it, pick the project, download
 
@@ -350,9 +381,18 @@ Fix every FAIL and every too-wide chart, then rerun it. `build_index.py` rewrite
 `<root>/index.html`, copies `library.js` (the 全部 / 最近一周 / 星标 tabs, stars, folder drop
 lists, new-tab links) beside it, and prints every publishable file path.
 
+`build_index.py` also writes each page's **agent context**, and the home page's: a
+`<script type="application/json" id="agent-context">` block that readers never see. It
+holds the paper's links (PDF, arXiv, project page, code), the page's file and figures in
+the GitHub repo, the profile, and how to answer questions and change the page, so an
+agent opened beside the artifact on claude.ai can work from the page alone. It is written
+from the meta tags and the header's links: keep those right, and never write or edit the
+block by hand. It holds no artifact link, because each account has its own copy.
+
 The whole library is **one** artifact, titled by the profile's "Artifact title" (Zhaoning
 Paper Pile; `build_index.py` puts it in the home page's `<title>`). Agents on every
-machine publish into the same one, so find it by its title on every run:
+machine publish into the same one, found by its title. Step 0 has usually found and read
+it already; use that one, and follow these steps for what is still missing:
 
 1. `list` your artifacts (`limit: 200`) and take the one whose title is exactly the
    artifact title. Only your own count: one shared from another account cannot take a
@@ -429,10 +469,24 @@ figure crop again before answering. Name the section, table or figure the answer
 from. A guess about a paper the user is trying to understand does more harm than saying
 "let me check".
 
+**Page changes wait.** Answering a question does not change the page. When an answer
+shows the page should change (it skipped what the user asked, or said it unclearly or
+wrongly), add one line to `<scratchpad>/<name>.pending.md`: what to change, and where.
+Feedback from step 9 goes on the same list. Apply the whole list in one pass (edit the
+page and the profile, then steps 6 and 7), give the page link again, and empty the list
+when:
+- the user asks you to update the page, or says they are done; or
+- an hour passes without a message from the user. After each reply that leaves the list
+  non-empty, start a timer, `sleep 3600` as a background Bash command; Claude Code wakes
+  you when it ends. Stop the previous timer first, so only the newest one can end. Where
+  the host cannot wake you, apply the list at the start of the first reply that comes an
+  hour or more after the user's previous message.
+
 ## 9. Report, then ask what to change
 
 Keep the terminal message short, in the profile's language:
-- the artifact link, and how to reach the page (home → project → paper);
+- the page link, `<artifact url>#<name>` (such as
+  `https://claude.ai/artifact/<id>#2026-10-15-DexAgent`), which opens this paper directly;
 - where the PDF and the page live;
 - the project chosen and why;
 - the three TL;DR lines.
@@ -446,14 +500,14 @@ claude.ai/code, for example to ask about the paper (step 8). It is a built-in Cl
 command that only the user can run, so do not try it through Bash or the Skill tool.
 Later replies leave it out.
 
-When the user answers, sort the feedback:
-- **About this paper** (a wrong number, an unclear stage, a missing figure): fix the
-  page, republish, commit and push.
+When the user answers, sort the feedback. Changes to the page and the profile go on the
+pending list and wait, like the answers to questions (step 8):
+- **About this paper** (a wrong number, an unclear stage, a missing figure): note the fix.
 - **About how they like papers explained** ("fewer bullets", "always show the key
-  equation"): fix the page, and also edit the matching line in the profile's "How I
-  learn" section (rewrite the line rather than appending a contradiction), and add a
-  dated line to its feedback log. Commit and push, so every machine picks it up. Every
-  later paper then follows it. Tell the user what changed in the profile.
+  equation"): note the page fix, and also the matching line in the profile's "How I
+  learn" section (rewrite the line rather than appending a contradiction) and a dated
+  line for its feedback log. The push then carries it to every machine, and every later
+  paper follows it. When the list is applied, tell the user what changed in the profile.
 - **About structure or design for every page**: change the template or this file, and
   say which one you changed.
 
@@ -485,9 +539,10 @@ keep it out of the library: it gets its own artifact, and nothing is filed or pu
   `files:` its crops (`<name>/…`), `icon: "book"` and a description that starts with
   "Temporary:". The tool nests the page, doctype and all, inside its own skeleton, which
   renders fine. A fix republishes to the same artifact.
-- Skip step 7. Steps 8 and 9 run as usual; the report says the paper is temporary and
-  that its files go when the scratchpad is cleared. Feedback on how the user likes papers
-  explained still goes into the profile, committed and pushed as usual.
+- Skip step 7. Steps 8 and 9 run as usual; the report gives the temporary artifact's own
+  link, with no `#`, and says the paper is temporary and that its files go when the
+  scratchpad is cleared. Feedback on how the user likes papers explained still goes into
+  the profile, committed and pushed as usual.
 - If the user then wants to keep it, file it: move the PDF, the page and its crops into
   the project folder, restore those five places from the template, and run steps 6
   and 7.
