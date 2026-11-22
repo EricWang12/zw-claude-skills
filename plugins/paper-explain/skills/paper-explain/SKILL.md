@@ -440,6 +440,10 @@ git -C <root> push
 - If the push is rejected because another machine pushed first, run
   `git -C <root> pull --rebase`. If `index.html` conflicts, rerun `build_index.py`,
   `git add index.html`, `git rebase --continue`, then push again.
+- If an `ssh` origin refuses the push (`Permission denied (publickey)`, common in a
+  background session that has no SSH agent) and `git config credential.helper` names a
+  helper, push the same commits over HTTPS:
+  `git -C <root> push https://github.com/EricWang12/all_papers.git HEAD:main`.
 - If the push fails for any other reason (no network, no credentials), keep the local
   commit and tell the user.
 
