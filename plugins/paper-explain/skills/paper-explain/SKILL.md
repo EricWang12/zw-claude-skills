@@ -1,6 +1,6 @@
 ---
 name: paper-explain
-description: Explain a research paper or tool the way this user learns best, and file it in their paper library. Given a paper link (arXiv abs/pdf, project page, OpenReview, any PDF URL) or a tool's GitHub repo or release, it downloads the PDF into the right project folder under a dated short name (2026-10-15-DexAgent), reads the whole paper, crops and inspects the authors' figures, and writes a visual page - the problem told on one running example (where each baseline breaks), a concise related-work table (what each neighbor solves, how, and how this paper differs), then big picture → stages → per-stage detail with flowcharts, the original figures explained part by part. The page is saved next to the PDF, added as a new page of the user's single library artifact (Zhaoning Paper Pile, found by its title in the artifact list and created if missing), and the library is pulled from and pushed to its GitHub repo so every machine stays in sync. Use this whenever the user shares a paper, project-page or tool-release link, or asks to read, explain, summarize, break down, TL;DR or "help me understand" a paper or tool, or to add one to the library - even if they never say "explain". A paper called temporary ("temporary", "temp", 临时) gets its own artifact and is never filed or pushed. Also use it to work from the user's starred papers (星标), such as writing related work from them.
+description: Explain a research paper or tool the way this user learns best, and file it in their paper library. Given a paper link (arXiv abs/pdf, project page, OpenReview, any PDF URL) or a tool's GitHub repo or release, it downloads the PDF into the right project folder under a dated short name (2026-10-15-DexAgent), reads the whole paper, crops and inspects the authors' figures, and writes a visual page - the problem told on one running example (where each baseline breaks), a concise related-work table (what each neighbor solves, how, and how this paper differs), then big picture → stages → per-stage detail with flowcharts, the original figures explained part by part. The page is saved next to the PDF, added as a new page of the user's single library artifact (Zhaoning Paper Pile, found by its title in the artifact list and created if missing), and the library is pulled from and pushed to its GitHub repo so every machine stays in sync. Use this whenever the user shares a paper, project-page or tool-release link, or asks to read, explain, summarize, break down, TL;DR or "help me understand" a paper or tool, or to add one to the library - even if they never say "explain". A paper called temporary ("temporary", "temp", 临时) gets its own artifact and is never filed or pushed. Also use it to work from the user's starred papers (星标), such as writing related work from them, and to sync the library ("sync", "同步", or after switching Claude accounts): every account's copy of the artifact and the GitHub repo are kept in step both ways, pages and stars, so the library is the same on every account.
 ---
 
 # Paper explain
@@ -53,14 +53,27 @@ user's newer word.
 
 ### Give the repo and the artifact what the other has
 
+The library must look the same from every Claude account the user signs in with. Each
+account has its own copy of the artifact, with its own database, and a chat in one account
+reaches only that copy. The GitHub repo is the one hub they share: every run brings the
+current account's copy and the repo into step, both ways, so whatever one account adds
+(a page made in a chat, a page changed there, a star) reaches the repo, and from there
+every other account at its next run. Nothing that only one account holds may stay there.
+
 A paper explained in a claude.ai chat reaches the artifact but often not the repo, and
 one explained here may never have reached the artifact. So every run, before its own
-paper, makes each side whole from the other. Nothing is ever deleted on either side.
+paper, makes each side whole from the other. No page is ever deleted on either side.
+
+**A run without a paper.** When the user says "sync" / "同步" (to bring the account
+they are in up to date), or switches accounts, do step 0 alone and report what moved.
 
 1. **Find the artifact**: `list` your artifacts (`limit: 200`) and take the one whose
    title is exactly the profile's artifact title. Only your own count; one shared from
-   another account cannot take a publish. If there is none, skip this sync: step 6
-   creates the artifact with the whole library.
+   another account cannot take a publish. A session can change accounts midway, so when
+   a read, a publish or a database call says the copy is shared from another
+   organization, it is not this account's either. If there is none, skip this sync:
+   step 6 creates this account's copy from the repo, which is how a new account gets the
+   library.
 2. **List it**: `read` it (the tool refuses to update an artifact this session has not
    read), then `list` its files (`scope: "files"`). Write its pages to
    `<scratchpad>/artifact-pages.txt`, one `<path> <sha256>` line for each `.html` under
@@ -75,10 +88,23 @@ paper, makes each side whole from the other. Nothing is ever deleted on either s
      artifact's into the scratchpad and tell the user.
    - `wontfit <path>`: only here, but the artifact is full (at most 511 files a version,
      40 kept free for new papers). It stays in the repo; tell the user.
-4. **Apply**: after any download, run `build_index.py` (step 6) and commit and push
-   (step 7) with the message `Sync from the artifact: <names>`. Then publish the `upload`
-   files, with `index.html` and `library.js`, as step 6 publishes.
-5. Say in one line what moved each way, and name every conflict and every page that did
+4. **Stars**, which live in each copy's database (collection `stars`, one doc per star;
+   "Starred papers" below), are shared through `<root>/stars.json`. With the ArtifactData
+   tool, `list` the collection `stars` and write its doc ids to `<scratchpad>/stars-db.txt`,
+   one per line; `get` the doc `config/sync` and write its `stars` list to
+   `<scratchpad>/stars-base.txt`, the stars this copy had at its last sync. Then:
+   `python3 SKILL_DIR/scripts/stars_sync.py <root> --db <scratchpad>/stars-db.txt --base <scratchpad>/stars-base.txt`
+   (leave `--base` out when `config/sync` does not exist yet). It applies what the user
+   starred and unstarred in this account since its last sync to `stars.json`, and prints
+   this copy's writes: `set <id> <path>` (the doc `stars/<id>` as `{"path": <path>}`),
+   `delete <id>`, and last `stars <n> <list>`. Do them in one `batch`, together with
+   setting `config/sync` to `{"stars": <list>}`; pin each entry for a doc that exists with
+   the `version` your list or get showed (`if_version`), and if a pin fails, read again
+   and redo this step. If the database cannot be read, skip the stars and say so.
+5. **Apply**: after any download or a changed `stars.json`, run `build_index.py` (step 6)
+   and commit and push (step 7) with the message `Sync from the artifact: <what>`. Then
+   publish the `upload` files, with `index.html` and `library.js`, as step 6 publishes.
+6. Say in one line what moved each way, and name every conflict and every page that did
    not fit.
 
 ## 1. Find the paper and its metadata
@@ -557,19 +583,17 @@ On the library pages the user stars papers, or whole project folders, to mark th
 they will work from, such as the papers for a related-work section or a paper to review
 carefully. When they ask for their starred papers (星标), gather them yourself:
 
-1. `list` artifacts with `scope: "all"` and `limit: 200`, and keep every one titled
-   exactly the artifact title. Each account has its own copy with its own stars, so use
-   them all.
-2. For each copy, `list` the collection `stars` with the ArtifactData tool, and take the
-   union of the doc ids. `<Project>:<name>` is one paper, the page
-   `<root>/<Project>/artifact/<name>.html`. A bare `<Project>` is the whole folder: every
-   page in `<root>/<Project>/artifact/` now, including papers filed after the star. Skip
-   an id whose page is no longer in the library, and say so.
+1. Sync first (step 0), so the stars made in this account are in the shared set, then read
+   `<root>/stars.json`: its `stars` hold the stars of every account. Another account's
+   newest stars arrive with that account's next run.
+2. `<Project>:<name>` is one paper, the page `<root>/<Project>/artifact/<name>.html`. A
+   bare `<Project>` is the whole folder: every page in `<root>/<Project>/artifact/` now,
+   including papers filed after the star. Skip an id whose page is no longer in the
+   library, and say so.
 3. Load each paper's page and PDF text as in step 8, downloading a missing PDF from the
    page's `paper:pdf` link. With many papers, read the pages first and open each PDF
    where the task needs its details.
-4. Say which papers you are using and which copies their stars came from, then do the
-   task.
+4. Say which papers you are using, then do the task.
 
 ## Ground rules
 

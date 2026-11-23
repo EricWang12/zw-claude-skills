@@ -103,6 +103,13 @@ Both hosts load the same `skills/paper-explain/SKILL.md`.
   deleted. A page changed on both sides keeps the repo's copy and is named; a page that
   does not fit the artifact's 511-file cap stays in the repo and is named too
   (`scripts/sync_plan.py` decides which way each page goes)
+- **The same library on every Claude account.** Each account has its own copy of the
+  artifact; the GitHub repo is the hub they share. Pages and stars made in one account
+  reach the repo at that account's next run, and every other account at its own next run.
+  A star or an unstar travels too: the repo's `stars.json` holds the shared set, and each
+  copy remembers its stars at its last sync, so only what changed there is applied
+  (`scripts/stars_sync.py`). After switching accounts, say "sync" (or "同步") to bring the
+  account you are in up to date without explaining a paper
 - **Pages that brief an agent.** Every page, and the home page, carries a hidden
   `agent-context` block (the paper's PDF, arXiv, project page and code links, the page's
   file in the GitHub repo, the profile, how to answer and change it). Open the artifact on

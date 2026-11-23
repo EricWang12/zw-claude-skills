@@ -6,7 +6,9 @@
    section. Stars live in the artifact's database, collection "stars", one doc per star:
      "<Project>"         a whole folder, including papers filed into it later
      "<Project>:<name>"  one paper, the page <Project>/artifact/<name>.html
-   Claude reads that collection to gather the starred papers (SKILL.md, "Starred papers").
+   Each account's copy has its own database, so every run of the skill merges this
+   collection with the library repo's stars.json both ways (SKILL.md, step 0): a star made
+   in one account shows in every account after its next run, and so does an unstar.
    The doc "config/home", {url: "https://claude.ai/artifact/<id>"}, is the artifact's own
    link (each account's copy has its own); links opened in a new tab need it (below).
    Where the page cannot reach the database (a saved copy, a signed-out viewer) the stars
