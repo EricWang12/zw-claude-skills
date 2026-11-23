@@ -285,10 +285,7 @@ def main():
 """
     (root / "index.html").write_text(page)
     shutil.copyfile(ASSETS / "library.js", root / "library.js")
-    print("library.js")
-    for f in sorted(root.glob("*/artifact/**/*")):
-        if f.is_file():
-            print(f.relative_to(root).as_posix())
+    print(f"index.html and library.js written: {total} pages")
 
 
 if __name__ == "__main__":

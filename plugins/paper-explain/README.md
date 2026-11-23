@@ -100,9 +100,13 @@ Both hosts load the same `skills/paper-explain/SKILL.md`.
 - **The repo and the artifact kept whole, both ways.** Every run first gives each side what
   the other has: a page explained in a claude.ai chat (artifact only) is copied into the
   repo and pushed, and a page that never reached the artifact is published. Nothing is
-  deleted. A page changed on both sides keeps the repo's copy and is named; a page that
-  does not fit the artifact's 511-file cap stays in the repo and is named too
+  deleted. A page changed on both sides keeps the repo's copy and is named
   (`scripts/sync_plan.py` decides which way each page goes)
+- **Every page fits.** A version of an artifact holds at most 511 files, so the artifact
+  holds the pages and keeps their figures in its asset store (5000 files, 1 GiB). Each
+  copy publishes `figures.js`, its map from a figure's path to the stored asset, and
+  `library.js` points the pages' figures there; the pages stay the repo's, byte for byte
+  (`scripts/figures_map.py` writes the map and checks every upload line)
 - **The same library on every Claude account.** Each account has its own copy of the
   artifact; the GitHub repo is the hub they share. Pages and stars made in one account
   reach the repo at that account's next run, and every other account at its own next run.

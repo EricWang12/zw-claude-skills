@@ -14,6 +14,12 @@
    Where the page cannot reach the database (a saved copy, a signed-out viewer) the stars
    stay hidden, and everything else works as before.
 
+   Figures: a version of the artifact holds at most 511 files, so each account's copy keeps
+   the papers' figures in its asset store and publishes figures.js, which maps a figure's
+   path in the library to its asset. A page's <img> and <video> keep their src relative to
+   the page, as in the repo; in the artifact each mapped one is pointed at its stored copy,
+   /_blob/<id>. Without figures.js (the repo, a saved copy) figures load from beside the page.
+
    The home page's tabs (全部, 最近一周, 星标) only hide cards: every paper stays in its own
    folder. 最近一周 shows the papers filed in the last 7 days, by the date in the page's name. */
 (async () => {
@@ -39,6 +45,19 @@
     const mark = () => { if (location.hash !== "#" + page[1]) location.replace("#" + page[1]); };
     if (!location.hash) mark();
     addEventListener("hashchange", () => setTimeout(mark));  // after the page's own hashchange handler
+
+    // The page's figures, from this copy's asset store where figures.js maps them (above).
+    const map = document.createElement("script");
+    map.src = "../../figures.js";
+    map.onload = () => {
+      const root = new URL("../../", location.href).pathname, stored = window.FIGURES || {};
+      for (const el of document.querySelectorAll("img[src], video[src]")) {
+        const u = new URL(el.getAttribute("src"), location.href);
+        const f = u.pathname.startsWith(root) && stored[decodeURIComponent(u.pathname.slice(root.length))];
+        if (f) el.src = "/_blob/" + f.id;
+      }
+    };
+    document.head.append(map);
   }
 
   // Home page: each folder is a drop list, closed until opened. This browser remembers which are open.

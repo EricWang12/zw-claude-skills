@@ -67,27 +67,41 @@ paper, makes each side whole from the other. No page is ever deleted on either s
 **A run without a paper.** When the user says "sync" / "同步" (to bring the account
 they are in up to date), or switches accounts, do step 0 alone and report what moved.
 
+**Where the figures live.** A version of the artifact holds at most 511 files, and the
+library has far more, nearly all of them figures. So the artifact holds the pages as
+files and keeps their figures in its asset store (5000 files, 1 GiB). Each copy publishes
+`figures.js`, its map from a figure's path in the library to the asset that stores it,
+and `library.js` points each page's `<img>` and `<video>` at that asset (`/_blob/<id>`).
+The pages stay the repo's, byte for byte. `figures.js` belongs to one copy, because asset
+ids differ between accounts: it lives in the artifact and the scratchpad, never in the
+repo.
+
 1. **Find the artifact**: `list` your artifacts (`limit: 200`) and take the one whose
    title is exactly the profile's artifact title. Only your own count; one shared from
    another account cannot take a publish. A session can change accounts midway, so when
    a read, a publish or a database call says the copy is shared from another
-   organization, it is not this account's either. If there is none, skip this sync:
-   step 6 creates this account's copy from the repo, which is how a new account gets the
-   library.
+   organization, it is not this account's either. If there is none, create this
+   account's copy, which is how a new account gets the library: run `build_index.py`
+   (step 6), stage `index.html` and `library.js` (item 6.1) and publish
+   `<scratchpad>/lib/index.html` without `url`, with `root: <scratchpad>/lib`,
+   `files: {"library.js": "library.js"}`, `capabilities: {"db": {}, "assets": {}}`,
+   `icon: "book"` and a one-sentence description. The sync below then fills it.
 2. **List it**: `read` it (the tool refuses to update an artifact this session has not
-   read), then `list` its files (`scope: "files"`). Write its pages to
-   `<scratchpad>/artifact-pages.txt`, one `<path> <sha256>` line for each `.html` under
-   `*/artifact/` as listed, and note the file count the listing starts with.
-3. **Plan**: `python3 SKILL_DIR/scripts/sync_plan.py <root> <scratchpad>/artifact-pages.txt --files <count>`.
-   It prints one line per page that must move, then `same <n>` and `room <n>`:
+   read), then `list` its files (`scope: "files"`) and write the listing's lines, as
+   they are, to `<scratchpad>/listing.txt`. This copy's map of stored figures is kept
+   in `<scratchpad>/figures.js`: delete any old one, and if the listing has
+   `figures.js`, `read` it (`path: "figures.js"`) and copy the saved file there.
+3. **Plan**: `python3 SKILL_DIR/scripts/sync_plan.py <root> <scratchpad>/listing.txt --figures <scratchpad>/figures.js > <scratchpad>/plan.txt`.
+   It prints one line per move, then `same <n>`:
    - `download <path>`: only in the artifact, or newer there (a page changed in a chat).
      `read` the page and every listed file under its folder (`<path>` without `.html`)
-     with `paths`, and copy them from where the tool saved them into `<root>`, same paths.
-   - `upload <path>`: only here, or newer here; the lines after a page name its figures.
+     with `paths`, and copy them from where the tool saved them into `<root>`, same
+     paths.
+   - `upload <path>`: a page only here, or newer here; or `library.js`, when the copy's
+     differs from the library's.
    - `conflict <path>`: changed on both sides. The repo's copy stays; `read` the
      artifact's into the scratchpad and tell the user.
-   - `wontfit <path>`: only here, but the artifact is full (at most 511 files a version,
-     40 kept free for new papers). It stays in the repo; tell the user.
+   - `asset <path>`: a figure this copy does not store yet, or stores an older version of.
 4. **Stars**, which live in each copy's database (collection `stars`, one doc per star;
    "Starred papers" below), are shared through `<root>/stars.json`. With the ArtifactData
    tool, `list` the collection `stars` and write its doc ids to `<scratchpad>/stars-db.txt`,
@@ -101,11 +115,39 @@ they are in up to date), or switches accounts, do step 0 alone and report what m
    setting `config/sync` to `{"stars": <list>}`; pin each entry for a doc that exists with
    the `version` your list or get showed (`if_version`), and if a pin fails, read again
    and redo this step. If the database cannot be read, skip the stars and say so.
-5. **Apply**: after any download or a changed `stars.json`, run `build_index.py` (step 6)
-   and commit and push (step 7) with the message `Sync from the artifact: <what>`. Then
-   publish the `upload` files, with `index.html` and `library.js`, as step 6 publishes.
-6. Say in one line what moved each way, and name every conflict and every page that did
-   not fit.
+5. **Apply**: run `build_index.py` (step 6): it rebuilds the home page and copies this
+   skill's `library.js` beside it. If that, a download or the stars changed the library,
+   commit and push (step 7) with the message `Sync from the artifact: <what>`. Then run
+   the plan again (item 3): the downloaded pages' figures now show as `asset`, and a new
+   `library.js` as `upload`. Its lines are what item 6 sends.
+6. **Publish**, when the plan has an `upload` or `asset` line or the listing still holds
+   figure files (`<Project>/artifact/<page>/…`):
+   1. Stage the files to send in `<scratchpad>/lib`, with their paths in the library
+      (Artifact sources must sit under the working directory or the scratchpad), and
+      start a new `<scratchpad>/uploads.txt`:
+      `rm -rf <scratchpad>/lib <scratchpad>/uploads.txt && mkdir -p <scratchpad>/lib && cd <root> && cp --parents index.html library.js $(awk '$1=="asset"||$1=="upload"&&$2!="library.js"{print $2}' <scratchpad>/plan.txt) <scratchpad>/lib/`
+   2. The asset store must be on before the first upload. If the `read` did not show
+      `assets` among the copy's capabilities, publish `<scratchpad>/lib/index.html` to
+      it (`url`, `root: <scratchpad>/lib`) with `capabilities: {"db": {}, "assets": {}}`.
+   3. Upload every `asset` figure: `publish` with `url`, `asset: true` and `file_paths`,
+      25 staged files (`<scratchpad>/lib/<path>`) per call. After each call, append the
+      result's lines, as they are, to `<scratchpad>/uploads.txt`.
+   4. Map them: `python3 SKILL_DIR/scripts/figures_map.py <root> <scratchpad>/listing.txt --uploads <scratchpad>/uploads.txt --figures <scratchpad>/figures.js --out <scratchpad>/figures.js`.
+      Upload again each file it names on a `bad` line (a copying slip) or a `missing`
+      line (an upload that failed or was left out), append those results, and run it
+      again until it names none. Its `remove` lines are the copy's old figure files, now
+      stored as assets.
+   5. Publish to `url`: `file_path: <scratchpad>/lib/index.html`,
+      `root: <scratchpad>/lib`, `capabilities: {"db": {}, "assets": {}}`, and `files` in
+      the map form, which alone can pass `null`: `"library.js": "library.js"`,
+      `"figures.js": "<scratchpad>/figures.js"`, every `upload` page as
+      `"<path>": "<path>"`, and every `remove` path as `"<path>": null`. One
+      publish takes at most 250 entries. When there are more, send `library.js`,
+      `figures.js` and the `remove` entries first, because they free the room, and the
+      pages after, in further publishes to the same `url` with the same `file_path`.
+   6. `list` the files once to confirm: the pages, `index.html`, `library.js`,
+      `figures.js`, and no figure files.
+7. Say in one line what moved each way, and name every conflict.
 
 ## 1. Find the paper and its metadata
 
@@ -404,8 +446,8 @@ python3 SKILL_DIR/scripts/build_index.py <root>
   at phone width.
 
 Fix every FAIL and every too-wide chart, then rerun it. `build_index.py` rewrites
-`<root>/index.html`, copies `library.js` (the 全部 / 最近一周 / 星标 tabs, stars, folder drop
-lists, new-tab links) beside it, and prints every publishable file path.
+`<root>/index.html` and copies `library.js` (the 全部 / 最近一周 / 星标 tabs, stars, folder
+drop lists, new-tab links, figures from the asset store) beside it.
 
 `build_index.py` also writes each page's **agent context**, and the home page's: a
 `<script type="application/json" id="agent-context">` block that readers never see. It
@@ -415,39 +457,19 @@ agent opened beside the artifact on claude.ai can work from the page alone. It i
 from the meta tags and the header's links: keep those right, and never write or edit the
 block by hand. It holds no artifact link, because each account has its own copy.
 
-The whole library is **one** artifact, titled by the profile's "Artifact title" (Zhaoning
-Paper Pile; `build_index.py` puts it in the home page's `<title>`). Agents on every
-machine publish into the same one, found by its title. Step 0 has usually found and read
-it already; use that one, and follow these steps for what is still missing:
-
-1. `list` your artifacts (`limit: 200`) and take the one whose title is exactly the
-   artifact title. Only your own count: one shared from another account cannot take a
-   publish, so it counts as not found.
-2. **Found:** `read` it, then `list` its files (`scope: "files"`); the tool refuses to
-   update an artifact this session has not read. Publish into it, which adds the paper
-   as a new page: `url`, `file_path: <root>/index.html`, `root: <root>`,
-   `capabilities: {"db": {}}` (the database that keeps the stars) and `files:` set to
-   `library.js` and the new or changed page and its figure files. If the listing has no
-   `library.js` yet, also add every page (`.html`) that is both in the listing and in
-   the printed paths, so the older pages get their star. Files you leave out stay as they
-   are. When a redo removes a figure, use the map form of `files`
-   (`{"<path>": "<path>", "<old path>": null}`), because only the map form can pass
-   `null`.
-3. **Not found:** create it with the whole library: `file_path: <root>/index.html`,
-   `root: <root>`, `files:` every path the script printed (as `{"path": …}` items),
-   `capabilities: {"db": {}}`, `icon: "book"` and a one-sentence description.
+The whole library is **one** artifact per account, titled by the profile's "Artifact
+title" (Zhaoning Paper Pile; `build_index.py` puts it in the home page's `<title>`), with
+the pages as files and the figures in its asset store (step 0, "Where the figures live").
+Step 0 has found or created this account's copy and read it. Publish the new page the
+way step 0 publishes: `list` the files again into `<scratchpad>/listing.txt`, run the
+plan again (the page shows as `upload`, its figures as `asset`), and do step 0's item 6.
+A redo that drops a figure needs nothing more: the figure leaves `figures.js`, and its
+asset stays unused.
 
 **The artifact's own link.** A link opened in a new tab must reach the artifact's
 claude.ai link, so `library.js` reads it from the artifact's database: the doc
 `config/home`, `{"url": "<artifact url>"}`. After every publish, `get` it with the
 ArtifactData tool, and `set` it if it is missing. Each account's copy has its own.
-
-Artifact sources must sit under the session's working directory or scratchpad. If the
-library does not, copy `index.html`, `library.js` and the new files into the scratchpad
-with the same relative paths, and use that copy as `root`.
-
-After publishing, `list` the files once to confirm that the page and its figures are
-there.
 
 ## 7. Commit and push
 
